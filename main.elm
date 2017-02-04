@@ -8,8 +8,6 @@ import Json.Decode as Decode
 import Collage
 import Color exposing (Color)
 import Element
---import Actions exposing (Action)
-
 
 main =
     Html.program
@@ -19,12 +17,12 @@ main =
         , subscriptions = subscriptions
         }
 
--- MODEL
+-- DATA
+
 type Side = Black | White | None
 type Piece = Pusher | Peon | Wall | Void | Empty
 type Direction = Up | Left | Right | Down
 
---type alias Position = {x: Int, y: Int}
 type alias Cell = {side: Side, peice: Piece, position: Position}
 -- TODO use dict grid?
 type alias Grid = List Cell
@@ -53,6 +51,8 @@ neighbor grid cell side width height =
             Nothing
 
 
+-- MODEL
+
 type alias Model = { grid   : Grid,
                      width  : Int,
                      height : Int,
@@ -60,11 +60,12 @@ type alias Model = { grid   : Grid,
                      log    : String}
 
 init : (Model, Cmd Msg)
-init = (Model [Cell Black Peon (Position 2 5) ] 4 8 30 "wakka", Cmd.none)
+init = (Model [Cell Black Peon (Position 2 5) ] 4 8 30 "", Cmd.none)
 
 type Msg = ClickAt Position | Clear
 
 ---- UPDATE
+
 intdiv : Int -> Int -> Int
 intdiv a b = floor ((toFloat a) / (toFloat b))
 
@@ -73,18 +74,14 @@ update msg model = (updateHelp msg model, Cmd.none)
 
 updateHelp : Msg -> Model -> Model
 updateHelp msg model =
-    --text (toString (length model.grid))
-
     case msg of
-            --{ model | grid = ((Cell Black Peon (Position (floor ()  (floor (toFloat y/(toFloat model.size))))) :: model.grid )}
         ClickAt {x, y} ->
             let (xpos, ypos) =
                 (intdiv x model.size, intdiv y model.size)
             in
                 { model | grid = ((Cell Black Peon (Position xpos (model.height - ypos - 1))) :: model.grid)
                         , log = toString ((x, y), (xpos, ypos)) }
-        --ClickAt xy -> { model | grid = append model.grid [Cell Black Peon xy])}
-        Clear      -> { model | grid = []}
+        Clear      -> { model | grid = [], log=""}
 
 -- SUBSCRIPTIONS
 
@@ -135,72 +132,19 @@ renderWell { width, height, grid, size} =
         (Collage.filled (Color.rgb 236 240 241) (Collage.rect (toFloat (width * size)) (toFloat (height * size)))
             :: (grid
                 |> List.map (\c->renderBox xoff yoff (toFloat c.position.x) (toFloat c.position.y) (toFloat size))
-                --|> List.map (\c -> renderBox ( (1 - toFloat c.x) / 2, (1 - toFloat c.y) / 2 ) ))
             )
         )
             |> Collage.collage (width*size) (height*size)
             |> Element.toHtml
 
 
---renderBox : ( Float, Float ) -> Color -> ( Int, Int ) -> Collage.Form
---renderBox ( xOff, yOff ) c ( x, y ) =
---    Collage.rect 30 30
---        |> Collage.filled c
---        |> Collage.move ( (toFloat x + xOff) * 30, (toFloat y + yOff) * -30 )
 renderBox : Float -> Float -> Float -> Float -> Float -> Collage.Form
 renderBox xoff yoff x y size =
     Collage.rect size size
         |> Collage.filled (Color.rgb 255 0 0)
         |> Collage.move ( (size*x + xoff) ,  (size*y + yoff))
 
---view model =
-
---    div
---        [ onMouseDown
---        , style
---            [ "background-color" => "#3C8D2F"
---            , "cursor" => "move"
-
---              , "width" => "100px"
---              , "height" => "100px"
---              , "border-radius" => "4px"
---              , "position" => "relative"
---              , "left" => "400px"
---              , "top" => "400px"
-
---              , "color" => "white"
---              , "display" => "flex"
---              , "align-items" => "center"
---              , "justify-content" => "center"
---              ]
---          ]
---          [ text "Drag Me!"
---        ]
-
-
 
 px : Int -> String
 px number =
   toString number ++ "px"
-
-onMouseDown : Attribute Msg
-onMouseDown =
-  on "mousedown" (Decode.map ClickAt Mouse.position)
---type Msg
---  = Change String
-
---update : Msg -> Model -> Model
---update msg model =
---  case msg of
---    Change newContent ->
---      { model | content = newContent }
-
-
----- VIEW
-
---view : Model -> Html Msg
---view model =
---  div []
---    [ input [ placeholder "Text to reverse", onInput Change ] []
---    , div [] [ text (String.reverse model.content) ]
---    ]

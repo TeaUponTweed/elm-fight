@@ -56,10 +56,11 @@ neighbor grid cell side width height =
 type alias Model = { grid   : Grid,
                      width  : Int,
                      height : Int,
-                     size   : Int}
+                     size   : Int,
+                     log    : String}
 
 init : (Model, Cmd Msg)
-init = (Model [Cell Black Peon (Position 1 3) ] 4 8 30, Cmd.none)
+init = (Model [Cell Black Peon (Position 2 5) ] 4 8 30 "wakka", Cmd.none)
 
 type Msg = ClickAt Position | Clear
 
@@ -76,7 +77,12 @@ updateHelp msg model =
 
     case msg of
             --{ model | grid = ((Cell Black Peon (Position (floor ()  (floor (toFloat y/(toFloat model.size))))) :: model.grid )}
-        ClickAt {x, y} ->  { model | grid = ((Cell Black Peon (Position (intdiv x model.size) (intdiv y model.size))) :: model.grid )}
+        ClickAt {x, y} ->
+            let (xpos, ypos) =
+                (intdiv x model.size, intdiv y model.size)
+            in
+                { model | grid = ((Cell Black Peon (Position xpos (model.height - ypos - 1))) :: model.grid)
+                        , log = toString ((x, y), (xpos, ypos)) }
         --ClickAt xy -> { model | grid = append model.grid [Cell Black Peon xy])}
         Clear      -> { model | grid = []}
 
@@ -99,35 +105,53 @@ key {grid} keycode =
 view : Model -> Html Msg
 view model =
     div
-        [ style [ "padding" => "30px 0" ] ]
-        [ div
+        []
+        [
+            div
             [ style
                 [ "height" => "680px"
                 , "margin" => "auto"
                 , "position" => "absolute"
-                , "border-radius" => "4px"
                 , "color" => "black"
                 , "width" => "480px"
                 ]
             ]
-            [ renderWell model ]
+            [ renderWell model ],
+        div
+        [ style
+            [ "height" => "680px"
+            , "width" => "480px"
+            , "position" => "absolute"
+            ]
+        ]
+        [text model.log]
         ]
 
 renderWell : Model -> Html Msg
 renderWell { width, height, grid, size} =
-    (Collage.filled (Color.rgb 236 240 241) (Collage.rect (toFloat (width * size)) (toFloat (height * size)))
-        :: (grid
-            |> List.map (\c->renderBox c.position.x c.position.y size)
+    let (xoff, yoff) =
+        ( -(toFloat (width - 1)) * (toFloat size) / 2.0, -(toFloat (height-1)) * (toFloat size) / 2.0)
+    in
+        (Collage.filled (Color.rgb 236 240 241) (Collage.rect (toFloat (width * size)) (toFloat (height * size)))
+            :: (grid
+                |> List.map (\c->renderBox xoff yoff (toFloat c.position.x) (toFloat c.position.y) (toFloat size))
+                --|> List.map (\c -> renderBox ( (1 - toFloat c.x) / 2, (1 - toFloat c.y) / 2 ) ))
+            )
         )
-    )
-        |> Collage.collage (width*size) (height*size)
-        |> Element.toHtml
+            |> Collage.collage (width*size) (height*size)
+            |> Element.toHtml
 
-renderBox : Int -> Int -> Int -> Collage.Form
-renderBox x y size =
-    Collage.rect (toFloat size) (toFloat size)
+
+--renderBox : ( Float, Float ) -> Color -> ( Int, Int ) -> Collage.Form
+--renderBox ( xOff, yOff ) c ( x, y ) =
+--    Collage.rect 30 30
+--        |> Collage.filled c
+--        |> Collage.move ( (toFloat x + xOff) * 30, (toFloat y + yOff) * -30 )
+renderBox : Float -> Float -> Float -> Float -> Float -> Collage.Form
+renderBox xoff yoff x y size =
+    Collage.rect size size
         |> Collage.filled (Color.rgb 255 0 0)
-        |> Collage.move (toFloat (size*x), toFloat (size*y))
+        |> Collage.move ( (size*x + xoff) ,  (size*y + yoff))
 
 --view model =
 

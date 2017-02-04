@@ -79,8 +79,11 @@ updateHelp msg model =
             let (xpos, ypos) =
                 (intdiv x model.size, intdiv y model.size)
             in
-                { model | grid = ((Cell Black Peon (Position xpos (model.height - ypos - 1))) :: model.grid)
-                        , log = toString ((x, y), (xpos, ypos)) }
+                if inbounds (Position xpos ypos) model.width model.height then
+                    { model | grid = ((Cell Black Peon (Position xpos (model.height - ypos - 1))) :: model.grid)
+                            , log = toString ((x, y), (xpos, ypos)) }
+                else
+                    model
         Clear      -> { model | grid = [], log=""}
 
 -- SUBSCRIPTIONS

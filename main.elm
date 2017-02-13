@@ -8,6 +8,11 @@ import Json.Decode as Decode
 import Collage
 import Color exposing (Color)
 import Element
+import Window
+--import Task
+--import Maybe exposing (..)
+--import Result exposing (..)
+--import Task exposing (toResult)
 
 main =
     Html.program
@@ -57,12 +62,26 @@ type alias Model = { grid   : Grid,
                      width  : Int,
                      height : Int,
                      size   : Int,
-                     log    : String}
+                     log    : String,
+                     cameraposx : Float,
+                     cameraposy : Float,
+                     camerazoom : Float,
+                     width : Int,
+                     height : Int
+                    }
 
 init : (Model, Cmd Msg)
-init = (Model [Cell Black Peon (Position 2 5) ] 4 8 30 "", Cmd.none)
+init =  (Model [Cell Black Peon (Position 2 5) ] 4 8 30 "" 0.0 0.0 1.0 -1 -1, Cmd.none)
 
-type Msg = ClickAt Position | Clear
+--init =
+--    let
+--        windowSize = Task.toMaybe (Window.size)
+--    in
+--        case windowSize of
+--            Some {width, height} -> ((Model [Cell Black Peon (Position 2 5) ] 4 8 30 "" 0.0 0.0 1.0 width height), Cmd.none)
+--            Nothing -> ((Model [Cell Black Peon (Position 2 5) ] 4 8 30 "" 0.0 0.0 1.0 width height), Cmd.none)
+
+type Msg = ClickAtMsg Position | ClearMsg | WindowResizedMsg Window.Size
 
 ---- UPDATE
 
@@ -75,29 +94,32 @@ update msg model = (updateHelp msg model, Cmd.none)
 updateHelp : Msg -> Model -> Model
 updateHelp msg model =
     case msg of
-        ClickAt {x, y} ->
+        ClickAtMsg {x, y} ->
             let (xpos, ypos) =
                 (intdiv x model.size, intdiv y model.size)
             in
-                if inbounds (Position xpos ypos) model.width model.height then
+                if True then -- inbounds (Position xpos ypos) model.width model.height then
                     { model | grid = ((Cell Black Peon (Position xpos (model.height - ypos - 1))) :: model.grid)
                             , log = toString ((x, y), (xpos, ypos)) }
                 else
                     model
-        Clear      -> { model | grid = [], log=""}
+        ClearMsg -> { model | grid = [], log=""}
+
+        WindowResizedMsg {width, height} -> {model | width=width, height=height}
 
 -- SUBSCRIPTIONS
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-      Sub.batch [ Mouse.clicks ClickAt,
-                  Keyboard.downs (key model) ]
+      Sub.batch [ Mouse.clicks ClickAtMsg,
+                  Keyboard.downs (key model),
+                  Window.resizes WindowResizedMsg ]
 
 
 key: Model -> KeyCode -> Msg
 key {grid} keycode =
     case keycode of
-        _ -> Clear
+        _ -> ClearMsg
 -- View
 
 (=>) = (,)
@@ -124,7 +146,8 @@ view model =
             , "position" => "absolute"
             ]
         ]
-        [text model.log]
+        [ text ((toString model.width) ++ " " ++ (toString model.height))
+        , text model.log]
         ]
 
 renderWell : Model -> Html Msg

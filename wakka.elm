@@ -1,12 +1,15 @@
-import Html exposing (..)
-import Html.Attributes exposing (..)
+--import Html exposing (..)
+import Svg exposing (..)
+import Svg.Attributes exposing (..)
+import Html
 import Html.Events exposing (on)
+import Html.Attributes
 --import Json.Decode exposing (Decoder)
 import Json.Decode as Decode
 --import Json.Decode exposing (Decoder)
 import Mouse exposing (Position)
 import Debug exposing (log)
-
+import Dict
 
 main =
   Html.program
@@ -87,56 +90,56 @@ subscriptions model =
 (=>) = (,)
 
 
-view : Model -> Html Msg
+view : Model -> Html.Html Msg
 view model =
   let
     realPosition =
       getPosition model
   in
-    div []
-      [ div
+    Html.div []
+      [ Html.div
           [ makeMouseDown 1
-          , style
-              [ "background-color" => "#3C8D2F"
-              , "cursor" => "move"
+          , Html.Attributes.style
+            [ "background-color" => "#3C8D2F"
+            , "cursor" => "move"
 
-              , "width" => "100px"
-              , "height" => "100px"
-              , "border-radius" => "4px"
-              , "position" => "absolute"
-              , "left" => px realPosition.x
-              , "top" => px realPosition.y
+            , "width" => "100px"
+            , "height" => "100px"
+            --, "border-radius" => "4px"
+            , "position" => "absolute"
+            , "left" => px (realPosition.x + 100)
+            , "top" => px (realPosition.y + 100)
 
-              , "color" => "white"
-              , "display" => "flex"
-              , "align-items" => "center"
-              , "justify-content" => "center"
-              ]
+            --, "color" => "white"
+            --, "display" => "flex"
+            --, "align-items" => "center"
+            --, "justify-content" => "center"
+            ]
           ]
-          [ text "Drag Me!"
+          [ pusher 0.0 0.0 1.0 "#ffffff"
           ]
-      , div
-          [ makeMouseDown 3
-          , style
-              [ "background-color" => "#3C8D2F"
-              , "cursor" => "move"
+      --, Html.div
+      --    [ makeMouseDown 3
+      --    , Html.Attributes.style
+      --        [ "background-color" => "#3C8D2F"
+      --        , "cursor" => "move"
 
-              , "width" => "100px"
-              , "height" => "100px"
-              , "border-radius" => "4px"
-              , "position" => "absolute"
-              , "left" => px (realPosition.x + 100)
-              , "top" => px (realPosition.y+100)
+      --        , "width" => "100px"
+      --        , "height" => "100px"
+      --        , "border-radius" => "4px"
+      --        , "position" => "absolute"
+      --        , "left" => px (realPosition.x + 100)
+      --        , "top" => px (realPosition.y+100)
 
-              , "color" => "white"
-              , "display" => "flex"
-              , "align-items" => "center"
-              , "justify-content" => "center"
-              ]
-          ]
-          [ text "Drag You!"
-          ]
-      , div [] [text (toString model.id)]
+      --        , "color" => "white"
+      --        , "display" => "flex"
+      --        , "align-items" => "center"
+      --        , "justify-content" => "center"
+      --        ]
+      --    ]
+      --    [ text "Drag You!"
+      --    ]
+      , Html.div [] [ Html.text (toString model.id)]
       ]
 
 
@@ -163,3 +166,73 @@ makeMouseDown id =
     stupid = \p -> DragStart p id
   in
     on "mousedown" (Decode.map stupid Mouse.position)
+
+pusher : Float -> Float -> Float -> String -> Html.Html msg
+pusher posx posy size color =
+    let
+        totsize = 1.0 * 1.0
+    in
+        svg
+        [
+            version "1.1",
+            x (toString 0),
+            y (toString 0),
+            width (toString 100.0),
+            height (toString 100.0),
+            viewBox
+                    ("0 0 " ++
+                    toString (totsize) ++
+                    " " ++
+                    toString (totsize))
+        ]
+        [ rect
+            [ fill "#000000"
+            , x (toString posx)
+            , y (toString posy)
+            , width (toString size)
+            , height (toString size)
+            ]
+            []
+        , rect
+            [ fill color
+            , x (toString (posx+size * 0.05))
+            , y (toString (posy+size * 0.05))
+            , width (toString (size * 0.9))
+            , height (toString (size * 0.9))
+            ]
+            []
+        ]
+
+mover : Float -> Float -> Float -> String -> Html.Html msg
+mover posx posy size color =
+    let
+        totsize = 10.0 * size
+    in
+        svg
+        [
+                version "1.1",
+                x (toString 0),
+                y (toString 0),
+                width (toString totsize),
+                height (toString totsize),
+                viewBox
+                        ("0 0 " ++
+                        toString (totsize) ++
+                        " " ++
+                        toString (totsize))
+        ]
+        [ circle
+            [ fill "#000000"
+            , cx (toString (posx + (size/2.0)))
+            , cy (toString (posy + (size/2.0)))
+            , r (toString (size/2.0))
+            ]
+            []
+        , circle
+            [ fill color
+            , cx (toString (posx + (size/2.0)))
+            , cy (toString (posy + (size/2.0)))
+            , r (toString ((size * 0.9)/2.0))
+            ]
+            []
+        ]

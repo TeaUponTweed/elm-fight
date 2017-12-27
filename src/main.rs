@@ -5,6 +5,7 @@ extern crate indextree;
 // use std::collections::HashMap;
 // use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
+use std::iter;
 use noisy_float::prelude::*;
 use indextree::{Arena, NodeId};
 
@@ -141,6 +142,7 @@ struct MCTSNode {
     board: TicTacToeBoard,
     nwins: usize,
     nsims: usize,
+    // nloss: usize
     // children: Option<Vec<MCTSNode>>,
     // parent: Option<MCTSNode<'a>>
 }
@@ -151,6 +153,7 @@ impl MCTSNode {
             board: board,
             nwins: 0,
             nsims: 0,
+            // nloss: 0
             // children: None,
             // parent: parent
         }
@@ -259,19 +262,28 @@ impl MonteCarloTreeSearch {
 
     fn back_propagate(&mut self, child: NodeId, result: TicTacToeResult) {
         let ancestors : Vec<_> = child.ancestors(&self.nodes).collect();
-        self.nodes[child].data.nsims += 1;
-        if was_win(&self.nodes[child].data.board, &result) {
-            self.nodes[child].data.nwins += 1;
-            // ancestor.data.nwins += 1;
-        }
-        for ancestor in ancestors {
-            // self.nodes[ancestor].data.nsims += 1;
-            // let board = self.nodes[ancestor].data.board;
-            // assert_eq!(board, self.nodes[child].data.board);
-            self.nodes[ancestor].data.nsims += 1;
-            if was_win(&self.nodes[ancestor].data.board, &result) {
-                self.nodes[ancestor].data.nwins += 1;
-                // ancestor.data.nwins += 1;
+        // if was_win(&self.nodes[child].data.board, &result) {
+        //     self.nodes[child].data.nwins += 1;
+        //     // ancestor.data.nwins += 1;
+        // }
+        // self.nodes[child].data.nsims += 1;
+        // match result,self.nodes[child].data.board.is_whites_turn {
+        //     (WhiteWins, false) => {self.nodes[child].data.nwins += 1},
+        //     (WhiteWins, true)  => {self.nodes[child].data.nloss += 1},
+        //     (BlackWins, true)  => {self.nodes[child].data.nwins += 1},
+        //     (BlackWins, false) => {self.nodes[child].data.nloss += 1},
+        // }
+        for node in iter::once(child).chain(ancestors) {
+            self.nodes[node].data.nsims += 2;
+            match (&result, self.nodes[node].data.board.is_whites_turn) {
+                (&TicTacToeResult::WhiteWins, false) => {self.nodes[node].data.nwins += 2},
+                // (&TicTacToeResult::WhiteWins, true)  => {self.nodes[node].data.nwins -= 2},
+                // (WhiteWins, true)  => {self.nodes[node].data.nloss += 2},
+                (&TicTacToeResult::BlackWins, true)  => {self.nodes[node].data.nwins += 2},
+                // (&TicTacToeResult::BlackWins, false) => {self.nodes[node].data.nwins -= 2},
+                // (BlackWins, false) => {self.nodes[node].data.nloss += 1},
+                (&TicTacToeResult::CatsGame, _)      => {self.nodes[node].data.nwins += 1},
+                _                                    => {}
             }
         }
     }
@@ -293,14 +305,6 @@ impl MonteCarloTreeSearch {
                 Err(_) => panic!("can't get system time")
             };
         }
-        // for child in self.root.children(&self.nodes) {
-        //     println!("***************");
-        //     println!("{:?}", (self.nodes[child].data.nwins as f32)/(self.nodes[child].data.nsims as f32));
-        //     println!("{:?}", self.nodes[child].data.nwins);
-        //     println!("{:?}", self.nodes[child].data.nsims);
-        //     self.nodes[child].data.board.display();
-        //     println!("***************");
-        // }
         if let Some(best_child) = self.root.children(&self.nodes).max_by_key(|n| r32(self.nodes[*n].data.nwins as f32)/r32(self.nodes[*n].data.nsims as f32)) {
             return self.nodes[best_child].data.board;
         }
@@ -325,15 +329,19 @@ fn main() {
     let mut b = TicTacToeBoard::new();
     while !b.is_terminal() {
         b.display();
-        let mut mcts = MonteCarloTreeSearch::new(Duration::from_secs(2), b.clone());
+        let mut mcts = MonteCarloTreeSearch::new(Duration::from_secs(1), b.clone());
         b = mcts.make_move();
     }
     if b.white_wins() {
-        println!("O's wins");
+        println!("O's wins!");
     }
-    if b.black_wins() {
-        println!("X's wins");
+    else if b.black_wins() {
+        println!("X's wins!");
     }
+    else {
+        println!("Cats!");
+    }
+
     b.display()
 
     // while !b.is_terminal() {

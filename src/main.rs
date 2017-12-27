@@ -1,15 +1,16 @@
 extern crate rand;
-use std::error::Error;
+use std::collections::HashMap;
 
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 enum TicTacToePiece {
     Empty,
     Black,
     White
 }
 
-#[derive(Copy, Clone, Debug)]
+
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 struct TicTacToeBoard {
     data: [TicTacToePiece; 9],
     is_whites_turn: bool
@@ -79,11 +80,13 @@ impl TicTacToeBoard {
     }
 }
 
+
 struct NextMoves {
     board: TicTacToeBoard,
     current_ix: u8,
     last_changed_ix: Option<u8>
 }
+
 
 impl NextMoves {
     fn new(board: TicTacToeBoard) -> NextMoves
@@ -96,6 +99,7 @@ impl NextMoves {
     }
 }
 
+
 impl Iterator for NextMoves
 {
     type Item = TicTacToeBoard;
@@ -105,6 +109,7 @@ impl Iterator for NextMoves
             if self.board.data[i as usize] == TicTacToePiece::Empty {
                 if let Some(last_changed_ix) = self.last_changed_ix {
                     self.board.data[last_changed_ix as usize] = TicTacToePiece::Empty;
+                    self.board.is_whites_turn = !self.board.is_whites_turn;
                 }
                 let next_piece = {
                     if self.board.is_whites_turn {
@@ -117,6 +122,7 @@ impl Iterator for NextMoves
                 self.current_ix = i;
                 self.last_changed_ix = Some(i);
                 self.board.data[i as usize] = next_piece;
+                self.board.is_whites_turn = !self.board.is_whites_turn;
                 return Some(self.board)
             }
         }
@@ -124,17 +130,42 @@ impl Iterator for NextMoves
     }
 }
 
-fn main() {
-    let mut rng = rand::thread_rng();
 
+struct MCTSNode {
+    wins: u32,
+    losses: u32
+}
+
+
+struct MonteCarloTreeSearch {
+    nodes: HashMap<TicTacToeBoard, MCTSNode>,
+    rng: rand::ThreadRng
+}
+
+
+impl MonteCarloTreeSearch {
+    fn new() -> MonteCarloTreeSearch {
+        MonteCarloTreeSearch {
+            nodes: HashMap::new(),
+            rng: rand::thread_rng()
+        }
+    }
+
+    fn random_move(&mut self, board: &TicTacToeBoard) -> TicTacToeBoard {
+        match rand::seq::sample_iter(&mut self.rng,  NextMoves::new(*board), 1) {
+            Ok(next) => { next[0]}
+            Err(_) => {println!("It's so broken"); *board}
+        }
+    }
+}
+
+
+fn main() {
     let mut b = TicTacToeBoard::new();
+    let mut mcts = MonteCarloTreeSearch::new();
     while !b.is_terminal() {
         b.display();
-        match rand::seq::sample_iter(&mut rng,  NextMoves::new(b), 1) {
-            Ok(next) => { b = next[0]}
-            Err(_) => {return}
-        }
-        b.is_whites_turn = !b.is_whites_turn;
+        b = mcts.random_move(&b);
         if b.white_wins() {
             println!("O's wins");
         }

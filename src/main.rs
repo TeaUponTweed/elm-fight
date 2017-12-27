@@ -2,12 +2,11 @@ extern crate rand;
 extern crate noisy_float;
 extern crate indextree;
 
-// use std::collections::HashMap;
-// use std::collections::BTreeMap;
 use std::time::{Duration, SystemTime};
 use std::iter;
 use noisy_float::prelude::*;
 use indextree::{Arena, NodeId};
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 enum TicTacToePiece {
@@ -142,9 +141,6 @@ struct MCTSNode {
     board: TicTacToeBoard,
     nwins: usize,
     nsims: usize,
-    // nloss: usize
-    // children: Option<Vec<MCTSNode>>,
-    // parent: Option<MCTSNode<'a>>
 }
 
 impl MCTSNode {
@@ -153,32 +149,23 @@ impl MCTSNode {
             board: board,
             nwins: 0,
             nsims: 0,
-            // nloss: 0
-            // children: None,
-            // parent: parent
         }
     }
-
-    // fn new(board: TicTacToeBoard) -> MCTSNode {
-    //     new(board, None)
-    // }
 }
 
 struct MonteCarloTreeSearch {
     nodes: Arena<MCTSNode>,
-    // nsims: BTreeMap<usize, usize> // depth -> nsims
     root: NodeId,
     rng: rand::ThreadRng,
-    // max_depth: usize,
     max_time: Duration,
     start_time: SystemTime
 }
 
- fn confifence_bound(wi: usize, ni: usize, Ni: usize) -> R32 {
-    let wi = r32(wi as f32);
-    let ni = r32(ni as f32);
-    let Ni = r32(Ni as f32);
-    (Ni.ln()/ni.sqrt()) * 2.0.sqrt() + wi/ni
+ fn confifence_bound(nwins: usize, nsims: usize, total_sims: usize) -> R32 {
+    let nwins = r32(nwins as f32);
+    let nsims = r32(nsims as f32);
+    let total_sims = r32(total_sims as f32);
+    (total_sims.ln()/nsims.sqrt()) * 2.0.sqrt() + nwins/nsims
  }
 
 enum TicTacToeResult {
@@ -194,11 +181,8 @@ impl MonteCarloTreeSearch {
         let root = arena.new_node(MCTSNode::new(board));
         MonteCarloTreeSearch {
             nodes: arena,
-            // nodes: HashMap::new(),
-            // nsims: BTreeMap::new(),
             root: root,
             rng: rand::thread_rng(),
-            // max_depth: max_depth,
             max_time: max_time,
             start_time: now
         }
@@ -210,13 +194,7 @@ impl MonteCarloTreeSearch {
         }
 
         if root.children(&self.nodes).count() > 1 {
-            // let Ni = match self.nsims.get(root_depth+2) {
-            //     Some(n) => n,
-            //     None    => 0
-            // }
             let ntotal_sims = root.descendants(&self.nodes).map(|n| self.nodes[n].data.nsims).sum();
-            // let mut children = root.children(&self.nodes);
-            // children.next.
             if let Some(selected_child) = root.children(&self.nodes).max_by_key(|n| confifence_bound(self.nodes[*n].data.nwins, self.nodes[*n].data.nsims, ntotal_sims)) {
                 return self.selection(selected_child);
             }
@@ -230,7 +208,6 @@ impl MonteCarloTreeSearch {
     }
 
     fn expansion(&mut self, root: NodeId) {
-        // let children : Vec<_> = NextMoves::new(children).map(|child| MCTSNode::new(child, Some(root))
         for next_board in NextMoves::new(self.nodes[root].data.board) {
             let result = self.light_simulation(&next_board);
             let child_node = self.nodes.new_node(MCTSNode::new(next_board));
@@ -262,26 +239,11 @@ impl MonteCarloTreeSearch {
 
     fn back_propagate(&mut self, child: NodeId, result: TicTacToeResult) {
         let ancestors : Vec<_> = child.ancestors(&self.nodes).collect();
-        // if was_win(&self.nodes[child].data.board, &result) {
-        //     self.nodes[child].data.nwins += 1;
-        //     // ancestor.data.nwins += 1;
-        // }
-        // self.nodes[child].data.nsims += 1;
-        // match result,self.nodes[child].data.board.is_whites_turn {
-        //     (WhiteWins, false) => {self.nodes[child].data.nwins += 1},
-        //     (WhiteWins, true)  => {self.nodes[child].data.nloss += 1},
-        //     (BlackWins, true)  => {self.nodes[child].data.nwins += 1},
-        //     (BlackWins, false) => {self.nodes[child].data.nloss += 1},
-        // }
         for node in iter::once(child).chain(ancestors) {
             self.nodes[node].data.nsims += 2;
             match (&result, self.nodes[node].data.board.is_whites_turn) {
                 (&TicTacToeResult::WhiteWins, false) => {self.nodes[node].data.nwins += 2},
-                // (&TicTacToeResult::WhiteWins, true)  => {self.nodes[node].data.nwins -= 2},
-                // (WhiteWins, true)  => {self.nodes[node].data.nloss += 2},
                 (&TicTacToeResult::BlackWins, true)  => {self.nodes[node].data.nwins += 2},
-                // (&TicTacToeResult::BlackWins, false) => {self.nodes[node].data.nwins -= 2},
-                // (BlackWins, false) => {self.nodes[node].data.nloss += 1},
                 (&TicTacToeResult::CatsGame, _)      => {self.nodes[node].data.nwins += 1},
                 _                                    => {}
             }
@@ -316,15 +278,6 @@ impl MonteCarloTreeSearch {
 }
 
 
-fn was_win(board: &TicTacToeBoard, result: &TicTacToeResult) -> bool {
-    match (result, board.is_whites_turn) {
-        (&TicTacToeResult::WhiteWins, false) => true,
-        (&TicTacToeResult::BlackWins, true)  => true,
-        _ => false
-    }
-}
-
-
 fn main() {
     let mut b = TicTacToeBoard::new();
     while !b.is_terminal() {
@@ -344,15 +297,4 @@ fn main() {
 
     b.display()
 
-    // while !b.is_terminal() {
-    //     b.display();
-    //     b = mcts.random_move(&b);
-    //     if b.white_wins() {
-    //         println!("O's wins");
-    //     }
-    //     if b.black_wins() {
-    //         println!("X's wins");
-    //     }
-    // }
-    // b.display();
 }

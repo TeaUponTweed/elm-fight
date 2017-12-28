@@ -223,7 +223,7 @@ impl MonteCarloTreeSearch {
             return TicTacToeResult::BlackWins;
         }
         while !b.is_terminal() {
-            self.random_move(&mut b);
+            b = self.random_move(&b);
             if b.white_wins() {
                 return TicTacToeResult::WhiteWins;
             }
@@ -248,7 +248,7 @@ impl MonteCarloTreeSearch {
         }
     }
 
-    fn random_move(&mut self, board: &mut TicTacToeBoard) {
+    fn random_move(&mut self, board: &TicTacToeBoard) -> TicTacToeBoard {
         let next_piece = {
             if board.is_whites_turn {
                 TicTacToePiece::White
@@ -257,15 +257,18 @@ impl MonteCarloTreeSearch {
                 TicTacToePiece::Black
             }
         };
-        let empty_spaces: Vec<_> = {
-            (0..9).zip(board.data.iter()).filter(|p| *p.1 == TicTacToePiece::Empty).collect()
+        let mut next_moves = {
+            let empty_spaces = (0..9).zip(board.data.into_iter()).filter(|p| *p.1 == TicTacToePiece::Empty);
+            match rand::seq::sample_iter(&mut self.rng, empty_spaces, 1) {
+                Ok(next_moves) => { next_moves }
+                Err(_) => {panic!("No random move to make")}
+            }
         };
-        let mut next_moves = match rand::seq::sample_iter(&mut self.rng, empty_spaces.iter(), 1) {
-            Ok(next_moves) => { next_moves }
-            Err(_) => {panic!("No random move to make")}
-        };
-        let &(index, _) = next_moves.pop().expect("Empty next moves");
-        board.data[index] = next_piece;
+        let (index, _) = next_moves.pop().expect("Empty next moves");
+        // HACK should be able to use old board
+        let mut new_board = board.clone();
+        new_board.data[index] = next_piece;
+        new_board
     }
 
     fn make_move(&mut self) -> TicTacToeBoard {

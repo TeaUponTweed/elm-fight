@@ -95,8 +95,7 @@ struct NextMoves {
 
 
 impl NextMoves {
-    fn new(board: TicTacToeBoard) -> NextMoves
-    {
+    fn new(board: TicTacToeBoard) -> NextMoves {
         NextMoves {
             board: board,
             current_ix: 0 as u8,
@@ -106,8 +105,7 @@ impl NextMoves {
 }
 
 
-impl Iterator for NextMoves
-{
+impl Iterator for NextMoves {
     type Item = TicTacToeBoard;
 
     fn next(&mut self) -> Option<TicTacToeBoard> {
@@ -225,7 +223,7 @@ impl MonteCarloTreeSearch {
             return TicTacToeResult::BlackWins;
         }
         while !b.is_terminal() {
-            b = self.random_move(&b);
+            self.random_move(&mut b);
             if b.white_wins() {
                 return TicTacToeResult::WhiteWins;
             }
@@ -250,12 +248,24 @@ impl MonteCarloTreeSearch {
         }
     }
 
-    fn random_move(&mut self, board: &TicTacToeBoard) -> TicTacToeBoard {
-        let mut next_moves = match rand::seq::sample_iter(&mut self.rng,  NextMoves::new(board.clone()), 1) {
+    fn random_move(&mut self, board: &mut TicTacToeBoard) {
+        let next_piece = {
+            if board.is_whites_turn {
+                TicTacToePiece::White
+            }
+            else {
+                TicTacToePiece::Black
+            }
+        };
+        let empty_spaces: Vec<_> = {
+            (0..9).zip(board.data.iter()).filter(|p| *p.1 == TicTacToePiece::Empty).collect()
+        };
+        let mut next_moves = match rand::seq::sample_iter(&mut self.rng, empty_spaces.iter(), 1) {
             Ok(next_moves) => { next_moves }
             Err(_) => {panic!("No random move to make")}
         };
-        next_moves.pop().expect("Empty next moves")
+        let &(index, _) = next_moves.pop().expect("Empty next moves");
+        board.data[index] = next_piece;
     }
 
     fn make_move(&mut self) -> TicTacToeBoard {

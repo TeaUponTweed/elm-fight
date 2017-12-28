@@ -16,7 +16,7 @@ enum TicTacToePiece {
 }
 
 
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct TicTacToeBoard {
     data: [TicTacToePiece; 9],
     is_whites_turn: bool
@@ -30,43 +30,43 @@ impl TicTacToeBoard {
             is_whites_turn: true
         }
     }
-    fn is_terminal(self) -> bool {
+    fn is_terminal(&self) -> bool {
         self.is_cats() || self.white_wins() || self.black_wins()
     }
 
-    fn white_wins(self) -> bool {
+    fn white_wins(&self) -> bool {
         self.diagonal_victory(TicTacToePiece::White) ||
         self.row_victory(TicTacToePiece::White)      ||
         self.column_victory(TicTacToePiece::White)
     }
 
-    fn black_wins(self) -> bool {
+    fn black_wins(&self) -> bool {
         self.diagonal_victory(TicTacToePiece::Black) ||
         self.row_victory(TicTacToePiece::Black)      ||
         self.column_victory(TicTacToePiece::Black)
     }
 
-    fn is_cats(self) -> bool {
+    fn is_cats(&self) -> bool {
         !self.data.into_iter().any(|p| {*p == TicTacToePiece::Empty})
     }
 
-    fn diagonal_victory(self, color: TicTacToePiece) -> bool{
+    fn diagonal_victory(&self, color: TicTacToePiece) -> bool{
         (self.data[0] == color && self.data[4] == color && self.data[8] == color) ||
         (self.data[2] == color && self.data[4] == color && self.data[6] == color)
     }
-    fn row_victory(self, color: TicTacToePiece) -> bool{
+    fn row_victory(&self, color: TicTacToePiece) -> bool{
         (self.data[0] == color && self.data[1] == color && self.data[2] == color) ||
         (self.data[3] == color && self.data[4] == color && self.data[5] == color) ||
         (self.data[6] == color && self.data[7] == color && self.data[8] == color)
     }
 
-    fn column_victory(self, color: TicTacToePiece) -> bool{
+    fn column_victory(&self, color: TicTacToePiece) -> bool{
         (self.data[0] == color && self.data[3] == color && self.data[6] == color) ||
         (self.data[1] == color && self.data[4] == color && self.data[7] == color) ||
         (self.data[2] == color && self.data[5] == color && self.data[8] == color)
     }
 
-    fn display(self) {
+    fn display(&self) {
         let string_board: Vec<String> = self.data[..].iter().map({|p| match *p {
             TicTacToePiece::Empty => " ".to_string(),
             TicTacToePiece::White => "O".to_string(),
@@ -129,7 +129,7 @@ impl Iterator for NextMoves
                 self.last_changed_ix = Some(i);
                 self.board.data[i as usize] = next_piece;
                 self.board.is_whites_turn = !self.board.is_whites_turn;
-                return Some(self.board)
+                return Some(self.board.clone())
             }
         }
         return None
@@ -208,7 +208,7 @@ impl MonteCarloTreeSearch {
     }
 
     fn expansion(&mut self, root: NodeId) {
-        for next_board in NextMoves::new(self.nodes[root].data.board) {
+        for next_board in NextMoves::new(self.nodes[root].data.board.clone()) {
             let result = self.light_simulation(&next_board);
             let child_node = self.nodes.new_node(MCTSNode::new(next_board));
             root.append(child_node, &mut self.nodes);
@@ -251,10 +251,11 @@ impl MonteCarloTreeSearch {
     }
 
     fn random_move(&mut self, board: &TicTacToeBoard) -> TicTacToeBoard {
-        match rand::seq::sample_iter(&mut self.rng,  NextMoves::new(*board), 1) {
-            Ok(next) => { next[0]}
-            Err(_) => {println!("It's so broken"); *board}
-        }
+        let mut next_moves = match rand::seq::sample_iter(&mut self.rng,  NextMoves::new(board.clone()), 1) {
+            Ok(next_moves) => { next_moves }
+            Err(_) => {panic!("No random move to make")}
+        };
+        next_moves.pop().expect("Empty next moves")
     }
 
     fn make_move(&mut self) -> TicTacToeBoard {
@@ -268,7 +269,7 @@ impl MonteCarloTreeSearch {
             };
         }
         if let Some(best_child) = self.root.children(&self.nodes).max_by_key(|n| r32(self.nodes[*n].data.nwins as f32)/r32(self.nodes[*n].data.nsims as f32)) {
-            return self.nodes[best_child].data.board;
+            return self.nodes[best_child].data.board.clone();
         }
         else
         {

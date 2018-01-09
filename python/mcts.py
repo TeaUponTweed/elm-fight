@@ -25,13 +25,17 @@ class Node(object):
 
     def simulate(self):
         b = self.board
+        i = 0
         while not b.is_over():
-            b = random.choice(set(b.gen_next_states()))
+            b = random.choice(list(b.gen_next_states()))
+            # b = random.choice(list(set(b.gen_next_states())))
+            i += 1
+        print(i)
         white_wins = not b.is_whites_turn
         return white_wins
 
     def backpropagate(self, white_wins):
-        if self.board.is_whites_turn == white_wins:
+        if self.board.is_whites_turn != white_wins:
             self.nwins += 1
         self.nvisits += 1
         if self.parent is not None:

@@ -5,7 +5,7 @@ class Board(object):
         self.is_whites_turn = is_whites_turn
 
     def __hash__(self):
-        return hash((sorted(self.pieces.items(), self.anchored, self.is_whites_turn)))
+        return hash((tuple(sorted(self.pieces.items())), self.anchored, self.is_whites_turn))
 
     def gen_neighbors(self, pieces, row, col):
         unexplored = set([(row, col)])
@@ -25,27 +25,31 @@ class Board(object):
 
     def gen_next_states(self, pieces=None, nmoves=2):
         pieces = pieces or self.pieces
-        yield from self.gen_execute_pushes(pieces)
+        for thing in self.gen_execute_pushes(pieces):
+            yield thing
         if nmoves == 0:
             return
 
         for piece, (row, col) in pieces.items():
+            if 'w' in piece != self.is_whites_turn:
+                continue
+
             for (other_row, other_col) in self.gen_neighbors(pieces, row, col):
                 next_pieces = pieces.copy()
                 next_pieces[piece] = (other_row, other_col)
-                yield from self.gen_next_states(next_pieces, nmoves - 1)
+                for thing in self.gen_next_states(next_pieces, nmoves - 1):
+                    yield thing
 
     def gen_execute_pushes(self, pieces):
         if self.is_whites_turn:
             pushers = ('wp1', 'wp2', 'wp3')
         else:
             pushers = ('bp1', 'bp2', 'bp3')
-
+        inverted_pieces = dict(((r,c),p) for p, (r, c) in pieces.items())
         for pusher in pushers:
             row,  col = pieces[pusher]
             for dr, dc in gen_cardinal_dirs():
-                can_push, pushed_pieces = self.try_push(
-                    pieces, row + dr, col + dr, dr, dc, [pusher])
+                can_push, pushed_pieces = self.try_push(inverted_pieces, row + dr, col + dc, dr, dc, [pusher])
                 if can_push:
                     new_pieces = pieces.copy()
                     for piece in pushed_pieces:
@@ -53,17 +57,18 @@ class Board(object):
                         new_pieces[piece] = (r + dr, c + dc)
                     yield Board(new_pieces, anchored=(row + dr, col + dc), is_whites_turn=not self.is_whites_turn)
 
-    def try_push(self, pieces, row, col, dr, dc, pushed_pieces):
+    def try_push(self, inverted_pieces, row, col, dr, dc, pushed_pieces):
         if (row, col) == self.anchored:
             return False, pushed_pieces
 
-        if (row, col) in pieces:
-            return try_push(pieces, row + dr, col + dc, pushed_pieces + [pieces])
+        if (row, col) in inverted_pieces:
+            piece = inverted_pieces[(row, col)]
+            return self.try_push(inverted_pieces, row + dr, col + dc, dr, dc, pushed_pieces + [piece])
         else:
             if row == -1:
-                return not (2 < col < 8), pushed_pieces
+                return not (2 < col < 8) and len(pushed_pieces) > 1, pushed_pieces
             elif row == 4:
-                return not (1 < col < 7), pushed_pieces
+                return not (1 < col < 7) and len(pushed_pieces) > 1, pushed_pieces
             else:
                 return len(pushed_pieces) > 1, pushed_pieces
 
@@ -71,14 +76,33 @@ class Board(object):
         pieces = pieces or self.pieces
         return not all(is_inbounds(r, c) for r, c in pieces.values())
 
+    def vis(self):
+        board = [
+            ['  ','  ','  ','==','==','==','==','==','  ','  '],
+            ['  ','  ','  ','__','__','__','__','__','  ','  '],
+            ['  ','__','__','__','__','__','__','__','__','  '],
+            ['  ','__','__','__','__','__','__','__','__','  '],
+            ['  ','  ','__','__','__','__','__','  ','  ','  '],
+            ['  ','  ','==','==','==','==','==','  ','  ','  '],
+        ]
+        for piece, (row, col) in self.pieces.items():
+            if 'm' in piece:
+                board[row+1][col] = '{}{}'.format(piece[0].upper(), piece[1])
+            else:
+                board[row + 1][col] = '{}{}'.format(piece[0].upper(), piece[1].upper())
+        if self.anchored is not None:
+            row, col = self.anchored
+            board[row+1][col] = '{}#'.format(board[row+1][col][0])
+        for row in board:
+            # print(row)
+            print(''.join(row))
+        print()
 
+
+_CARDINAL_DIRS = ((-1, 0), (1, 0), (0, -1), (0, 1))
 def gen_cardinal_dirs():
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
-            if dr == dc == 0:
-                continue
-            yield dr, dc
-
+    for direction in _CARDINAL_DIRS:
+        yield direction
 
 def gen_ajacent_ixs(row, col):
     for dr, dc in gen_cardinal_dirs():
@@ -98,15 +122,15 @@ def is_inbounds(row, col):
 
 EXAMPLE_BOARD = Board(
     pieces={
-        'wp1': (0, 4),
-        'wp2': (1, 4),
-        'wp3': (3, 4),
-        'wm1': (2, 4),
-        'wm2': (2, 3),
-        'bp1': (0, 5),
+        'wp1': (1, 4),
+        'wp2': (2, 4),
+        'wp3': (2, 2),
+        'wm1': (0, 4),
+        'wm2': (3, 4),
+        'bp1': (3, 5),
         'bp2': (2, 5),
-        'bp3': (3, 5),
-        'bm1': (2, 5),
+        'bp3': (0, 5),
+        'bm1': (1, 5),
         'bm2': (1, 6)
     },
     anchored=None,

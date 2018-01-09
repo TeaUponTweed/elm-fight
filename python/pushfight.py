@@ -4,10 +4,12 @@ class Board(object):
         self.anchored = anchored
         self.is_whites_turn = is_whites_turn
 
-    def gen_neighbors(self, pieces, row, col):
-        unexplored = set((row, col))
-        explored = set(pieces.values())
+    def __hash__(self):
+        return hash((sorted(self.pieces.items(), self.anchored, self.is_whites_turn)))
 
+    def gen_neighbors(self, pieces, row, col):
+        unexplored = set([(row, col)])
+        explored = set(pieces.values())
         def should_explore(row, col):
             key = (row, col)
             return (is_inbounds(row, col) and
@@ -16,18 +18,19 @@ class Board(object):
         while unexplored:
             row, col = unexplored.pop()
             explored.add((row, col))
-            yield row, col
             for row, col in gen_ajacent_ixs(row, col):
                 if should_explore(row, col):
+                    yield row, col
                     unexplored.add((row, col))
 
     def gen_next_states(self, pieces=None, nmoves=2):
         pieces = pieces or self.pieces
+        yield from self.gen_execute_pushes(pieces)
         if nmoves == 0:
-            yield from self.gen_execute_pushes(pieces)
+            return
 
-        for piece, (row, col) in pieces:
-            for (other_row, other_col) in self.gen_neighbors(row, col):
+        for piece, (row, col) in pieces.items():
+            for (other_row, other_col) in self.gen_neighbors(pieces, row, col):
                 next_pieces = pieces.copy()
                 next_pieces[piece] = (other_row, other_col)
                 yield from self.gen_next_states(next_pieces, nmoves - 1)

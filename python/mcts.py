@@ -7,10 +7,10 @@ class Node(object):
         self.nvisits = 0
         self.nwins = 0
         self.parent = parent
-        self.children = children or []
+        self.children = children
     
     def ucts(self, child):
-        return child.nwins / child.nvisits + math.sqrt(2 * math.log(self.nvisits) / child.visits)
+        return child.nwins / child.nvisits + math.sqrt(2 * math.log(self.nvisits) / child.nvisits)
 
     def select(self):
         if self.children is None:
@@ -21,11 +21,12 @@ class Node(object):
     def expand(self):
         assert self.children is None
         self.children = [Node(b, self) for b in self.board.gen_next_states()]
+        assert len(self.children) > 0
 
     def simulate(self):
         b = self.board
         while not b.is_over():
-            b = random.choice(list(b.gen_next_states()))
+            b = random.choice(set(b.gen_next_states()))
         white_wins = not b.is_whites_turn
         return white_wins
 

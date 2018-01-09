@@ -27,7 +27,7 @@ class Node(object):
         b = self.board
         # i = 0
         while not b.is_over():
-            next_states = list(b.gen_next_states())
+            next_states = list(set(b.gen_next_states()))
             winning_states = (ns for ns in next_states if ns.is_over())
             try:
                 b = next(winning_states)
@@ -55,7 +55,12 @@ class MCTS(object):
         while time.time() < endtime:
             next_node = root.select()
             next_node.expand()
+            winning_children = [child for child in next_node.children if child.board.is_over()]
+            if winning_children:
+                next_node.children = winning_children
+
             for child in next_node.children:
                 white_wins = child.simulate()
                 child.backpropagate(white_wins)
+
         return max(root.children, key=lambda x: x.nwins/x.nvisits).board

@@ -10,44 +10,48 @@ class Board(object):
     def gen_neighbors(self, pieces, row, col):
         unexplored = set([(row, col)])
         explored = set(pieces.values())
-        def should_explore(row, col):
-            key = (row, col)
-            return (is_inbounds(row, col) and
+        def should_explore(r, c):
+            key = (r, c)
+            return (is_inbounds(r, c) and
                     key not in explored)
 
         while unexplored:
             row, col = unexplored.pop()
             explored.add((row, col))
-            for row, col in gen_ajacent_ixs(row, col):
-                if should_explore(row, col):
-                    yield row, col
-                    unexplored.add((row, col))
+            for other_row, other_col in gen_ajacent_ixs(row, col):
+                if should_explore(other_row, other_col):
+                    yield other_row, other_col
+                    unexplored.add((other_row, other_col))
 
     def gen_next_states(self, pieces=None, nmoves=2):
         pieces = pieces or self.pieces
-        for thing in self.gen_execute_pushes(pieces):
-            yield thing
+        yield from self.gen_execute_pushes(pieces)
         if nmoves == 0:
             return
 
-        for piece, (row, col) in pieces.items():
-            if 'w' in piece != self.is_whites_turn:
-                continue
+        # for piece, (row, col) in pieces.items():
+        #     if 'w' in piece != self.is_whites_turn:
+        #         continue
+        if self.is_whites_turn:
+            movers = ('wp1', 'wp2', 'wp3', 'wm1', 'wm2')
+        else:
+            movers = ('bp1', 'bp2', 'bp3', 'bm1', 'bm2')
 
+        for mover in movers:
+            row, col = pieces[mover]
             for (other_row, other_col) in self.gen_neighbors(pieces, row, col):
                 next_pieces = pieces.copy()
-                next_pieces[piece] = (other_row, other_col)
-                for thing in self.gen_next_states(next_pieces, nmoves - 1):
-                    yield thing
+                next_pieces[mover] = (other_row, other_col)
+                yield from self.gen_next_states(next_pieces, nmoves - 1)
 
     def gen_execute_pushes(self, pieces):
         if self.is_whites_turn:
             pushers = ('wp1', 'wp2', 'wp3')
         else:
             pushers = ('bp1', 'bp2', 'bp3')
-        inverted_pieces = dict(((r,c),p) for p, (r, c) in pieces.items())
+        inverted_pieces = dict(((r, c), p) for p, (r, c) in pieces.items())
         for pusher in pushers:
-            row,  col = pieces[pusher]
+            row, col = pieces[pusher]
             for dr, dc in gen_cardinal_dirs():
                 can_push, pushed_pieces = self.try_push(inverted_pieces, row + dr, col + dc, dr, dc, [pusher])
                 if can_push:

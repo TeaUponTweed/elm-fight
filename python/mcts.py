@@ -25,12 +25,16 @@ class Node(object):
 
     def simulate(self):
         b = self.board
-        i = 0
+        # i = 0
         while not b.is_over():
-            b = random.choice(list(b.gen_next_states()))
-            # b = random.choice(list(set(b.gen_next_states())))
-            i += 1
-        print(i)
+            next_states = list(b.gen_next_states())
+            winning_states = (ns for ns in next_states if ns.is_over())
+            try:
+                b = next(winning_states)
+            except StopIteration:
+                b = random.choice(next_states)
+            # i += 1
+        # print(i)
         white_wins = not b.is_whites_turn
         return white_wins
 

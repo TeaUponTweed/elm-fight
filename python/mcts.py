@@ -1,3 +1,4 @@
+# from functools import lru_cache
 import math, random, time
 
 
@@ -8,7 +9,9 @@ class Node(object):
         self.nwins = 0
         self.parent = parent
         self.children = children
-    
+        self.has_winning_children = None
+        self.has_no_potenially_winning_children = None
+
     def ucts(self, child):
         return child.nwins / child.nvisits + math.sqrt(2 * math.log(self.nvisits) / child.nvisits)
 
@@ -17,25 +20,29 @@ class Node(object):
             return self
         else:
             return max(self.children, key=self.ucts).select()
-    
+   
     def expand(self):
         assert self.children is None
         self.children = [Node(b, self) for b in self.board.gen_next_states()]
         assert len(self.children) > 0
 
     def simulate(self):
-        b = self.board
-        # i = 0
-        while not b.is_over():
-            next_states = list(set(b.gen_next_states()))
+        if self.has_winning_children:
+            return not self.board.is_whites_turn
+
+        elif self.has_no_potenially_winning_children:
+            return self.board.is_whites_turn
+
+        current_board = self.board
+        while not current_board.is_over():
+            next_states = list(set(current_board.gen_next_states()))
             winning_states = (ns for ns in next_states if ns.is_over())
             try:
-                b = next(winning_states)
+                current_board = next(winning_states)
             except StopIteration:
-                b = random.choice(next_states)
-            # i += 1
-        # print(i)
-        white_wins = not b.is_whites_turn
+                current_board = random.choice(next_states)
+
+        white_wins = not self.board.is_whites_turn
         return white_wins
 
     def backpropagate(self, white_wins):
@@ -52,15 +59,22 @@ class MCTS(object):
     def get_next_move(self, board):
         endtime = time.time() + self.max_delta
         root = Node(board)
+        nnodes = 0
         while time.time() < endtime:
             next_node = root.select()
             next_node.expand()
             winning_children = [child for child in next_node.children if child.board.is_over()]
             if winning_children:
-                next_node.children = winning_children
-
+                next_node.has_winning_children = True
+            potentially_winning_children = [ child for child in next_node.children
+                if not any(nb.is_over() for nb in child.board.gen_next_states())]
+            if not potentially_winning_children:
+                next_node.has_no_potenially_winning_children = True
             for child in next_node.children:
+                nnodes += 1
+                print(nnodes)
                 white_wins = child.simulate()
                 child.backpropagate(white_wins)
+            # if nnodes % 1000:
 
         return max(root.children, key=lambda x: x.nwins/x.nvisits).board

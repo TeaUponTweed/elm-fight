@@ -7,6 +7,12 @@ class Board(object):
     def __hash__(self):
         return hash((tuple(sorted(self.pieces.items())), self.anchored, self.is_whites_turn))
 
+    def __eq__(self, other):
+        return (
+            (tuple(sorted(self.pieces.items())), self.anchored, self.is_whites_turn) == 
+            (tuple(sorted(other.pieces.items())), other.anchored, other.is_whites_turn)
+        )
+
     def gen_neighbors(self, pieces, row, col):
         unexplored = set([(row, col)])
         explored = set(pieces.values())
@@ -65,16 +71,18 @@ class Board(object):
         if (row, col) == self.anchored:
             return False, pushed_pieces
 
-        if (row, col) in inverted_pieces:
+        try:
             piece = inverted_pieces[(row, col)]
-            return self.try_push(inverted_pieces, row + dr, col + dc, dr, dc, pushed_pieces + [piece])
-        else:
+        except KeyError:
             if row == -1:
                 return not (2 < col < 8) and len(pushed_pieces) > 1, pushed_pieces
             elif row == 4:
                 return not (1 < col < 7) and len(pushed_pieces) > 1, pushed_pieces
             else:
                 return len(pushed_pieces) > 1, pushed_pieces
+        else:
+            pushed_pieces.append(piece)
+            return self.try_push(inverted_pieces, row + dr, col + dc, dr, dc, pushed_pieces)
 
     def is_over(self, pieces=None):
         pieces = pieces or self.pieces

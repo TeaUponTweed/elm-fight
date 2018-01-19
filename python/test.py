@@ -17,5 +17,10 @@ class TestPushfight(unittest.TestCase):
         pushes = list(pushes[1].gen_execute_pushes(pushes[1].pieces))
         self.assertEqual(len(pushes), 2)
 
+    def test_board(self):
+        a = Board(EXAMPLE_BOARD.pieces.copy(), None, True)
+        b = Board(EXAMPLE_BOARD.pieces.copy(), None, True)
+        self.assertEqual(a, b)
+
 if __name__ == '__main__':
     unittest.main()

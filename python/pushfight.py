@@ -44,6 +44,26 @@ class Board(object):
                 next_pieces[mover] = (other_row, other_col)
                 yield from self.gen_next_states(next_pieces, nmoves - 1)
 
+    def gen_connected_components(self, pieces):
+        occupied_positions = set(pieces.values())
+        all_toexplore = _ALL_POSITIONS - occupied_positions
+        while all_toexplore:
+            toexplore = set()
+            explored = set()
+            toexplore.add(all_toexplore.pop())
+            while toexplore:
+                row, col = toexplore.pop()
+                all_toexplore.discard((row, col))
+                explored.add((row, col))
+                for ix in (ix for ix in gen_ajacent_ixs(row, col) if is_inbounds(*ix)):
+                    other_row, other_col = ix
+                    if ix not in explored:
+                        if ix in occupied_positions:
+                            explored.add(ix)
+                        else:
+                            toexplore.add(ix)
+            yield explored
+
     def gen_execute_pushes(self, pieces):
         if self.is_whites_turn:
             pushers = ('wp1', 'wp2', 'wp3')
@@ -124,6 +144,14 @@ def is_inbounds(row, col):
         return False
 
 
+_ALL_POSITIONS = set()
+for row in range(4):
+    for col in range(0, 10):
+        if is_inbounds(row, col):
+            _ALL_POSITIONS.add((row, col))
+
+
+
 EXAMPLE_BOARD = Board(
     pieces={
         'wp1': (1, 4),
@@ -140,3 +168,4 @@ EXAMPLE_BOARD = Board(
     anchored=None,
     is_whites_turn=True
 )
+

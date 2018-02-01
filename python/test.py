@@ -16,6 +16,20 @@ class TestPushfight(unittest.TestCase):
         self.assertEqual(len(pushes), 3)
         pushes = list(pushes[1].gen_execute_pushes(pushes[1].pieces))
         self.assertEqual(len(pushes), 2)
+    
+    def test_connected_components(self):
+        ccs = list(EXAMPLE_BOARD.gen_connected_components(EXAMPLE_BOARD.pieces))
+        print(ccs)
+        print([len(cc) for cc in ccs])
+        assert len(ccs) == 2
+        EXAMPLE_BOARD.vis()
+        wakka = [['  ' for _ in range(10)] for _ in range(4)]
+        for i, ixs in enumerate(ccs):
+            for row, col in ixs:
+                assert wakka[row][col] == '  '
+                wakka[row][col] = ' {}'.format(i)
+        for row in wakka:
+            print(''.join(row))
 
 if __name__ == '__main__':
     unittest.main()

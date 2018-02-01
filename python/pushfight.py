@@ -1,3 +1,38 @@
+import itertools as it
+
+class OtherBoard(object):
+    def __init__(self, board):
+        pieces_dict = board.pieces
+        self.white_pushers = frozenset((pieces_dict['wp1'], pieces_dict['wp2'], pieces_dict['wp3']))
+        self.black_pushers = frozenset((pieces_dict['bp1'], pieces_dict['bp2'], pieces_dict['bp3']))
+        self.white_movers = frozenset((pieces_dict['wm1'], pieces_dict['wm2']))
+        self.black_movers = frozenset((pieces_dict['bm1'], pieces_dict['bm2']))
+        self.anchored = board.anchored
+
+    def __hash__(self):
+        return hash((self.white_pushers,
+                     self.black_pushers,
+                     self.white_movers,
+                     self.black_movers,
+                     self.anchored))
+
+    def __eq__(self, other):
+        return (self.white_pushers == other.white_pushers and
+                self.black_pushers == other.black_pushers and
+                self.white_movers == other.white_movers and
+                self.black_movers == other.black_movers and
+                self.anchored == other.anchored)
+
+    def to_dict(self):
+        out = {}
+        for k, v in it.chain(zip(('wp1', 'wp2', 'wp3'), self.white_pushers),
+                             zip(('bp1', 'bp2', 'bp3'), self.black_pushers),
+                             zip(('wm1', 'wm2'       ), self.white_movers),
+                             zip(('bm1', 'bm2'       ), self.black_movers)):
+            out[k] = v
+        return out
+
+
 class Board(object):
     def __init__(self, pieces, anchored, is_whites_turn):
         self.pieces = pieces
@@ -6,6 +41,9 @@ class Board(object):
 
     def __hash__(self):
         return hash((tuple(sorted(self.pieces.items())), self.anchored, self.is_whites_turn))
+
+    def __eq__(self, other):
+        return (tuple(sorted(self.pieces.items())), self.anchored, self.is_whites_turn) == (tuple(sorted(other.pieces.items())), other.anchored, other.is_whites_turn)
 
     def gen_neighbors(self, pieces, row, col):
         unexplored = set([(row, col)])
@@ -33,9 +71,9 @@ class Board(object):
         #     if 'w' in piece != self.is_whites_turn:
         #         continue
         if self.is_whites_turn:
-            movers = ('wp1', 'wp2', 'wp3', 'wm1', 'wm2')
+            movers = _WHITE_PIECES
         else:
-            movers = ('bp1', 'bp2', 'bp3', 'bm1', 'bm2')
+            movers = _BLACK_PIECES
 
         for mover in movers:
             row, col = pieces[mover]
@@ -66,9 +104,9 @@ class Board(object):
 
     def gen_execute_pushes(self, pieces):
         if self.is_whites_turn:
-            pushers = ('wp1', 'wp2', 'wp3')
+            pushers = _WHITE_PUSHERS
         else:
-            pushers = ('bp1', 'bp2', 'bp3')
+            pushers = _BLACK_PUSHERS
         inverted_pieces = dict(((r, c), p) for p, (r, c) in pieces.items())
         for pusher in pushers:
             row, col = pieces[pusher]
@@ -169,3 +207,7 @@ EXAMPLE_BOARD = Board(
     is_whites_turn=True
 )
 
+_WHITE_PUSHERS = ('wp1', 'wp2', 'wp3')
+_WHITE_PIECES = ('wp1', 'wp2', 'wp3', 'wm1', 'wm2')
+_BLACK_PUSHERS = ('bp1', 'bp2', 'bp3')
+_BLACK_PIECES = ('bp1', 'bp2', 'bp3', 'bm1', 'bm2')

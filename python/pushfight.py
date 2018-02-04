@@ -1,34 +1,32 @@
 import itertools as it
 
 class OtherBoard(object):
-    def __init__(self, board):
-        pieces_dict = board.pieces
+    def __init__(self, pieces_dict):
+        # pieces_dict = board.pieces
         self.white_pushers = frozenset((pieces_dict['wp1'], pieces_dict['wp2'], pieces_dict['wp3']))
         self.black_pushers = frozenset((pieces_dict['bp1'], pieces_dict['bp2'], pieces_dict['bp3']))
         self.white_movers = frozenset((pieces_dict['wm1'], pieces_dict['wm2']))
         self.black_movers = frozenset((pieces_dict['bm1'], pieces_dict['bm2']))
-        self.anchored = board.anchored
+        # self.anchored = board.anchored
 
     def __hash__(self):
         return hash((self.white_pushers,
                      self.black_pushers,
                      self.white_movers,
-                     self.black_movers,
-                     self.anchored))
+                     self.black_movers))
 
     def __eq__(self, other):
         return (self.white_pushers == other.white_pushers and
                 self.black_pushers == other.black_pushers and
                 self.white_movers == other.white_movers and
-                self.black_movers == other.black_movers and
-                self.anchored == other.anchored)
+                self.black_movers == other.black_movers)
 
     def to_dict(self):
         out = {}
         for k, v in it.chain(zip(('wp1', 'wp2', 'wp3'), self.white_pushers),
                              zip(('bp1', 'bp2', 'bp3'), self.black_pushers),
-                             zip(('wm1', 'wm2'       ), self.white_movers),
-                             zip(('bm1', 'bm2'       ), self.black_movers)):
+                             zip(('wm1', 'wm2'       ), self.white_movers ),
+                             zip(('bm1', 'bm2'       ), self.black_movers )):
             out[k] = v
         return out
 
@@ -63,24 +61,38 @@ class Board(object):
 
     def gen_next_states(self, pieces=None, nmoves=2):
         pieces = pieces or self.pieces
-        yield from self.gen_execute_pushes(pieces)
+        for b in (b.to_dict() for b in set(map(OtherBoard, self.gen_next_moves(pieces)))):
+            yield from self.gen_execute_pushes(b)
+        # for b in self.gen_next_moves(pieces):
+            # yield from self.gen_execute_pushes(b)
+
+    # def gen_next_moves(self, pieces, next_moves, nmoves=2):
+    def gen_next_moves(self, pieces, nmoves=2):
         if nmoves == 0:
+            yield pieces
             return
+        # next_moves = next_moves or {}
+        pos_to_piece_map = {v:k for k,v in pieces.items()}
+        for empty_spaces, pieces_pos in self.gen_connected_components(pieces):
+            movable_pieces = [pos_to_piece_map[pos] for pos in pieces_pos]
+            for piece in movable_pieces:
+                if self.is_whites_turn != piece.startswith('w'):
+                    continue
+                old_space = pieces[piece]
+                for empty_space in empty_spaces:
+                    pieces[piece] = empty_space
+                    # ob = OtherBoard(piece)
+                    # try:
+                    #     previous_number_of_moves = next_moves[ob]
+                    # except KeyError:
+                    #     next_moves[ob] = nmoves
+                    # else:
+                    #     if nmoves <= previous_number_of_moves:
+                    #         continue
+                    yield from self.gen_next_moves(pieces, nmoves-1)
 
-        # for piece, (row, col) in pieces.items():
-        #     if 'w' in piece != self.is_whites_turn:
-        #         continue
-        if self.is_whites_turn:
-            movers = _WHITE_PIECES
-        else:
-            movers = _BLACK_PIECES
+                pieces[piece] = old_space
 
-        for mover in movers:
-            row, col = pieces[mover]
-            for (other_row, other_col) in self.gen_neighbors(pieces, row, col):
-                next_pieces = pieces.copy()
-                next_pieces[mover] = (other_row, other_col)
-                yield from self.gen_next_states(next_pieces, nmoves - 1)
 
     def gen_connected_components(self, pieces):
         occupied_positions = set(pieces.values())
@@ -88,6 +100,7 @@ class Board(object):
         while all_toexplore:
             toexplore = set()
             explored = set()
+            pieces = set()
             toexplore.add(all_toexplore.pop())
             while toexplore:
                 row, col = toexplore.pop()
@@ -97,10 +110,10 @@ class Board(object):
                     other_row, other_col = ix
                     if ix not in explored:
                         if ix in occupied_positions:
-                            explored.add(ix)
+                            pieces.add(ix)
                         else:
                             toexplore.add(ix)
-            yield explored
+            yield explored, pieces
 
     def gen_execute_pushes(self, pieces):
         if self.is_whites_turn:

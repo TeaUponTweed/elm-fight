@@ -9,3 +9,4 @@
 * Bitpack boards
     * Investigate whether valid random moves can be generated from bit representation
 * Implement valid move detector: given two boards, could one be produced from the other
+* Catch short circuiting due to redundencies in positions caused by pieces being indistinguishable

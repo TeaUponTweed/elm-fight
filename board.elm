@@ -1,14 +1,21 @@
 import Browser
+
+import Debug exposing (log)
+
 import Dict exposing (Dict)
+
 import Html exposing (..)
 import Html.Events exposing (..)
-import Debug exposing (log)
 import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
+
 import Json.Decode as Decode
+import Json.Encode as Encode
+
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
+import Firebase
 
 main =
     Browser.element
@@ -19,9 +26,11 @@ main =
         }
 
 
+type alias Board = Dict Int Bool
+
 
 type alias Model =
-    { board : Dict Int Bool
+    { board : Board
     , nrows : Int
     , ncols : Int
     , npixels : Int
@@ -37,7 +46,7 @@ init _ =
 
 type Msg
     = MouseDownAt ( Float, Float )
-    --= MouseDownAt {x: Float, y: Float}
+    | GetBoard Decode.Value
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -52,10 +61,14 @@ togglePieceImpl val =
         Nothing -> Just True
 
 
-togglePiece : Dict Int Bool -> Int -> Dict Int Bool
+togglePiece : Board -> Int -> Board
 togglePiece d k =
     d |> Dict.update k togglePieceImpl
 
+--     String -> Result Decode.Error (Dict String Bool)
+decodeBoard : Decode.Decoder (Dict String Bool)
+decodeBoard = 
+    Decode.dict Decode.bool
 
 updateImpl : Msg -> Model -> Model
 updateImpl msg model =
@@ -70,8 +83,25 @@ updateImpl msg model =
                 else
                     model
 
+        GetBoard board ->
+            let
+                convertKeysToInts  ( key, value ) = (Maybe.withDefault 0 (String.toInt key), value)
+                updatedBoard = board
+                    |> Decode.decodeValue decodeBoard
+                    |> Result.withDefault Dict.empty
+            in
+                if updatedBoard /= Dict.empty then
+                    {model | board =  updatedBoard
+                                   |> Dict.toList
+                                   |> List.map convertKeysToInts
+                                   |> Dict.fromList
+                    }
+                else
+                    log "Could not update model with received board" model
 
-drawBoardSquares : Int -> Int -> Int -> Dict Int Bool -> Int -> List (Svg Msg) -> List (Svg Msg)
+
+
+drawBoardSquares : Int -> Int -> Int -> Board -> Int -> List (Svg Msg) -> List (Svg Msg)
 drawBoardSquares nrows ncols npixels board key squares =
     --log ((String.fromInt ncols) ++ " " ++ (String.fromInt ncols) ++ " " ++ (String.fromInt npixels) ++ " " ++ (String.fromInt key))
     let
@@ -109,4 +139,11 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+  firebaseSubscriptions model
+
+
+firebaseSubscriptions : Model -> Sub Msg
+firebaseSubscriptions model =
+  Sub.batch
+    [ Firebase.updateBoardFromFirebase GetBoard
+    ]

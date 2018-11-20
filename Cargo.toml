@@ -1,9 +1,0 @@
-[package]
-name = "mcts"
-version = "0.1.0"
-authors = ["Michael Mason <michael.mason@numerica.us>"]
-
-[dependencies]
-rand = "*"
-noisy_float = "*"
-indextree = "*"

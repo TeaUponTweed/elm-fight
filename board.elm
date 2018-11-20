@@ -26,7 +26,7 @@ main =
         }
 
 
-type alias Board = Dict Int Bool
+type alias Board = Dict String Bool
 
 
 type alias Model =
@@ -61,7 +61,7 @@ togglePieceImpl val =
         Nothing -> Just True
 
 
-togglePiece : Board -> Int -> Board
+togglePiece : Board -> String -> Board
 togglePiece d k =
     d |> Dict.update k togglePieceImpl
 
@@ -69,6 +69,20 @@ togglePiece d k =
 decodeBoard : Decode.Decoder (Dict String Bool)
 decodeBoard = 
     Decode.dict Decode.bool
+
+pack2 : (a -> b -> c) -> (a, b) -> c
+pack2 fn (x,y) =
+    fn x y
+
+encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
+encodeBoardImpl (key, val) = 
+    (key, Encode.bool val)
+
+encodeBoard : Board -> Encode.Value
+encodeBoard board = 
+    Encode.object(List.map encodeBoardImpl (Dict.toList board))
+
+
 
 updateImpl : Msg -> Model -> Model
 updateImpl msg model =
@@ -79,7 +93,7 @@ updateImpl msg model =
                 col = (floor x) // model.npixels
             in
                 if col < model.ncols && row < model.nrows then
-                    {model | board = togglePiece model.board (row * model.ncols + col )}
+                    {model | board = togglePiece model.board (String.fromInt (row * model.ncols + col ))}
                 else
                     model
 
@@ -92,9 +106,9 @@ updateImpl msg model =
             in
                 if updatedBoard /= Dict.empty then
                     {model | board =  updatedBoard
-                                   |> Dict.toList
-                                   |> List.map convertKeysToInts
-                                   |> Dict.fromList
+                                   --|> Dict.toList
+                                   --|> List.map convertKeysToInts
+                                   --|> Dict.fromList
                     }
                 else
                     log "Could not update model with received board" model
@@ -111,7 +125,7 @@ drawBoardSquares nrows ncols npixels board key squares =
         if key >= (nrows * ncols) then
             squares
         else
-            case Dict.get key board of
+            case Dict.get (String.fromInt key) board of
                 Just piece ->
                     drawBoardSquares nrows ncols npixels board (key + 1) (List.append squares [drawCircle px py (log "radius" (npixels//2)) "black"])
                 Nothing ->

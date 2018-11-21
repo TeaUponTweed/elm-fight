@@ -4,9 +4,11 @@ import Debug exposing (log, toString)
 
 import Dict exposing (Dict)
 
-import Html exposing (..)
-import Html.Events exposing (..)
-import Html.Attributes
+import Html exposing (Html, text, div)
+
+--import Html exposing (..)
+--import Html.Events exposing (..)
+--import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
 
 import Json.Decode as Decode
@@ -16,6 +18,10 @@ import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
 import Firebase
+
+import Material
+import Material.Button as Button
+import Material.Options as Options
 
 port localStorage : String -> Cmd msg
 
@@ -148,10 +154,16 @@ view model =
         pxheight = String.fromInt (model.nrows * model.npixels)
     in
       div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
-        [
-          svg
+        [ svg
             [ width pxwidth, height pxwidth, viewBox ("0 0" ++ " " ++ pxwidth ++ " " ++ pxheight), fill "gray", stroke "black", strokeWidth "0 "]
             (drawBoardSquares model.nrows model.ncols model.npixels model.board 0 [ rect [ x "0", y "0", width pxwidth, height pxheight] [] ])
+        , Button.view Mdc
+            "my-button"
+            model.mdc
+            [ Button.ripple
+            , Options.onClick Click
+            ]
+            [ text "Click me!" ]
         ]
 
 

@@ -17,6 +17,8 @@ import Svg.Attributes exposing (..)
 
 import Firebase
 
+port localStorage : String -> Cmd msg
+
 main =
     Browser.element
         { init = init
@@ -49,11 +51,6 @@ type Msg
     | GetBoard Decode.Value
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    ( updateImpl msg model, Cmd.none )
-
-
 togglePieceImpl : Maybe Bool -> Maybe Bool
 togglePieceImpl val = 
     case val of
@@ -83,9 +80,8 @@ encodeBoard board =
     Encode.object(List.map encodeBoardImpl (Dict.toList board))
 
 
-
-updateImpl : Msg -> Model -> Model
-updateImpl msg model =
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
     case msg of
         MouseDownAt (x, y) ->
             let
@@ -93,9 +89,13 @@ updateImpl msg model =
                 col = (floor x) // model.npixels
             in
                 if col < model.ncols && row < model.nrows then
-                    {model | board = togglePiece model.board (String.fromInt (row * model.ncols + col ))}
+                    ( { model | board = togglePiece model.board (String.fromInt (row * model.ncols + col )) }
+                    , Cmd.none
+                    )
                 else
-                    model
+                    ( model
+                    , Cmd.none
+                    )
 
         GetBoard board ->
             let
@@ -105,14 +105,13 @@ updateImpl msg model =
                     |> Result.withDefault Dict.empty
             in
                 if updatedBoard /= Dict.empty then
-                    {model | board =  updatedBoard
-                                   --|> Dict.toList
-                                   --|> List.map convertKeysToInts
-                                   --|> Dict.fromList
-                    }
+                    ( { model | board =  updatedBoard }
+                    , Firebase.updateBoardToFirebase (encodeBoard updatedBoard)
+                    )
                 else
-                    log "Could not update model with received board" model
-
+                    ( log "Could not update model with received board" model
+                    , Cmd.none
+                    )
 
 
 drawBoardSquares : Int -> Int -> Int -> Board -> Int -> List (Svg Msg) -> List (Svg Msg)

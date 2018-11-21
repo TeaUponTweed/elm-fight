@@ -89,9 +89,12 @@ update msg model =
                 col = (floor x) // model.npixels
             in
                 if col < model.ncols && row < model.nrows then
-                    ( { model | board = togglePiece model.board (String.fromInt (row * model.ncols + col )) }
-                    , Cmd.none
-                    )
+                    let
+                        updatedBoard = togglePiece model.board (String.fromInt (row * model.ncols + col ))
+                    in
+                        ( { model | board =  updatedBoard}
+                        , Firebase.updateBoardToFirebase (encodeBoard updatedBoard)
+                        )
                 else
                     ( model
                     , Cmd.none
@@ -116,19 +119,18 @@ update msg model =
 
 drawBoardSquares : Int -> Int -> Int -> Board -> Int -> List (Svg Msg) -> List (Svg Msg)
 drawBoardSquares nrows ncols npixels board key squares =
-    --log ((String.fromInt ncols) ++ " " ++ (String.fromInt ncols) ++ " " ++ (String.fromInt npixels) ++ " " ++ (String.fromInt key))
     let
-        px = log "px" (npixels * (modBy ncols key) + npixels // 2)
-        py = log "py" (npixels * (key // ncols   ) + npixels // 2)
+        px = (npixels * (modBy ncols key) + npixels // 2)
+        py = (npixels * (key // ncols   ) + npixels // 2)
     in
         if key >= (nrows * ncols) then
             squares
         else
             case Dict.get (String.fromInt key) board of
                 Just piece ->
-                    drawBoardSquares nrows ncols npixels board (key + 1) (List.append squares [drawCircle px py (log "radius" (npixels//2)) "black"])
+                    drawBoardSquares nrows ncols npixels board (key + 1) (List.append squares [drawCircle px py (npixels//2) "black"])
                 Nothing ->
-                    drawBoardSquares nrows ncols npixels board (key + 1) (List.append squares [drawCircle px py (log "radius" (npixels//2)) "white"])
+                    drawBoardSquares nrows ncols npixels board (key + 1) (List.append squares [drawCircle px py (npixels//2) "white"])
 
 
 drawCircle : Int -> Int -> Int -> String -> Svg Msg

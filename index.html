@@ -1,0 +1,84 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Main</title>
+  <!-- Compiled and minified CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+  <script src="main.js"></script>
+</head>
+
+<script src="https://www.gstatic.com/firebasejs/5.5.8/firebase.js"></script>
+<!-- <script type="module" src="script.js"></script> -->
+
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyDCtMMZovJXoBaJfvMho1_8ySjxQKyl2t4",
+    authDomain: "elm-fight.firebaseapp.com",
+    databaseURL: "https://elm-fight.firebaseio.com",
+    projectId: "elm-fight",
+    storageBucket: "elm-fight.appspot.com",
+    messagingSenderId: "894465552065"
+  };
+  // var firebase = require("firebase/app");
+
+  // require("firebase/auth");
+  // require("firebase/database");
+  // require("firebase/firestore");
+  // require("firebase/messaging");
+  // require("firebase/functions");
+
+  firebase.initializeApp(config);
+</script>
+
+<!-- <script src="https://www.gstatic.com/firebasejs/5.5.8/firebase-firestore.js"></script> -->
+
+<body>
+  <div id="elm"></div>
+  <script>
+  var app = Elm.Main.init({
+    node: document.getElementById('elm')
+  });
+
+  function updateBoard(board) {
+    var firestore = firebase.firestore()
+    const settings = {timestampsInSnapshots: true};
+    firestore.settings(settings);
+
+    var boardRef = firestore.collection('board').doc('test')
+    // var updates = {}
+    boardRef.set({'set_pieces': board}).then(() => {
+      console.log('Uploaded board to firestore')
+    }).catch(function (error) {
+      console.log('Failed to upload board to firestore ', error)
+    })
+
+    // update(usercontent) updates an entry using content as content node.
+    // updates['/board/test'] = board
+    // return firebase.firestore().ref().update(updates);
+  }
+
+  app.ports.updateBoardToFirebase.subscribe(function(board) {
+    console.log(board)
+    updateBoard(board)
+    // .then(function() {
+    //   app.ports.updatedBoard.send(true)
+    // })
+    // .catch(function(error) {
+    //   console.log(error.code)
+    //   console.log(error.message)
+    //   app.ports.updatedBoard.send(false)
+    // })
+  })
+  // var send_board_to_elm = (doc) =>
+  // db.collection("boards").doc("test")
+  //   .onSnapshot(function(doc) {
+  //       console.log("Current data: ", doc.data());
+  //   });
+  // app.ports.board.subscribe(function(data) {
+  //   localStorage.setItem('cache', JSON.stringify(data));
+  // });
+  </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hello-world</title>
+
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css" />
+    <link rel="stylesheet" href="material-components-web.css" />
+  </head>
+
+  <script>
+    // Initialize Firebase
+    var config = {
+      apiKey: "AIzaSyDCtMMZovJXoBaJfvMho1_8ySjxQKyl2t4",
+      authDomain: "elm-fight.firebaseapp.com",
+      databaseURL: "https://elm-fight.firebaseio.com",
+      projectId: "elm-fight",
+      storageBucket: "elm-fight.appspot.com",
+      messagingSenderId: "894465552065"
+    };
+
+    firebase.initializeApp(config);
+  </script>
+
+  <body class="mdc-typography">
+    <script src="elm-mdc.js"></script>
+    <script src="elm.js"></script>
+    <div id="elm"></div>
+    <script type="text/javascript">
+
+    var app = Elm.Main.init({
+      node: document.getElementById('elm')
+    });
+
+    var firestore = firebase.firestore()
+    const settings = {timestampsInSnapshots: true};
+    firestore.settings(settings);
+
+    function updateBoard(board) {
+      var boardRef = firestore.collection('board').doc('test')
+      boardRef.set({'set_pieces': board}).then(() => {
+        console.log('Uploaded board to firestore')
+      }).catch(function (error) {
+        console.log('Failed to upload board to firestore ', error)
+      })
+    }
+
+    app.ports.updateBoardToFirebase.subscribe(function(board) {
+      console.log(board)
+      updateBoard(board)
+    })
+
+    firestore.collection('board').doc('test')
+      .onSnapshot(function(doc) {
+          console.log("Current data: ", doc.data());
+          app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
+      });
+    </script>
+  </body>
+</html>

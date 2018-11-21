@@ -9,7 +9,6 @@
 </head>
 
 <script src="https://www.gstatic.com/firebasejs/5.5.8/firebase.js"></script>
-<!-- <script type="module" src="script.js"></script> -->
 
 <script>
   // Initialize Firebase
@@ -21,18 +20,10 @@
     storageBucket: "elm-fight.appspot.com",
     messagingSenderId: "894465552065"
   };
-  // var firebase = require("firebase/app");
-
-  // require("firebase/auth");
-  // require("firebase/database");
-  // require("firebase/firestore");
-  // require("firebase/messaging");
-  // require("firebase/functions");
 
   firebase.initializeApp(config);
 </script>
 
-<!-- <script src="https://www.gstatic.com/firebasejs/5.5.8/firebase-firestore.js"></script> -->
 
 <body>
   <div id="elm"></div>
@@ -41,36 +32,30 @@
     node: document.getElementById('elm')
   });
 
-  function updateBoard(board) {
-    var firestore = firebase.firestore()
-    const settings = {timestampsInSnapshots: true};
-    firestore.settings(settings);
+  var firestore = firebase.firestore()
+  const settings = {timestampsInSnapshots: true};
+  firestore.settings(settings);
 
+  function updateBoard(board) {
     var boardRef = firestore.collection('board').doc('test')
-    // var updates = {}
     boardRef.set({'set_pieces': board}).then(() => {
       console.log('Uploaded board to firestore')
     }).catch(function (error) {
       console.log('Failed to upload board to firestore ', error)
     })
-
-    // update(usercontent) updates an entry using content as content node.
-    // updates['/board/test'] = board
-    // return firebase.firestore().ref().update(updates);
   }
 
   app.ports.updateBoardToFirebase.subscribe(function(board) {
     console.log(board)
     updateBoard(board)
-    // .then(function() {
-    //   app.ports.updatedBoard.send(true)
-    // })
-    // .catch(function(error) {
-    //   console.log(error.code)
-    //   console.log(error.message)
-    //   app.ports.updatedBoard.send(false)
-    // })
   })
+
+  firestore.collection('board').doc('test')
+    .onSnapshot(function(doc) {
+        console.log("Current data: ", doc.data());
+        app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
+    });
+
   // var send_board_to_elm = (doc) =>
   // db.collection("boards").doc("test")
   //   .onSnapshot(function(doc) {

@@ -1,6 +1,6 @@
 import Browser
 
-import Debug exposing (log)
+import Debug exposing (log, toString)
 
 import Dict exposing (Dict)
 
@@ -49,6 +49,7 @@ init _ =
 type Msg
     = MouseDownAt ( Float, Float )
     | GetBoard Decode.Value
+    | DidUploadBoard Bool
 
 
 togglePieceImpl : Maybe Bool -> Maybe Bool
@@ -62,14 +63,11 @@ togglePiece : Board -> String -> Board
 togglePiece d k =
     d |> Dict.update k togglePieceImpl
 
---     String -> Result Decode.Error (Dict String Bool)
+
 decodeBoard : Decode.Decoder (Dict String Bool)
 decodeBoard = 
     Decode.dict Decode.bool
 
-pack2 : (a -> b -> c) -> (a, b) -> c
-pack2 fn (x,y) =
-    fn x y
 
 encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
 encodeBoardImpl (key, val) = 
@@ -101,18 +99,23 @@ update msg model =
                     )
 
         GetBoard board ->
-            let
-                convertKeysToInts  ( key, value ) = (Maybe.withDefault 0 (String.toInt key), value)
-                updatedBoard = board
-                    |> Decode.decodeValue decodeBoard
-                    |> Result.withDefault Dict.empty
-            in
-                if updatedBoard /= Dict.empty then
+            case Decode.decodeValue decodeBoard board of
+                Ok updatedBoard ->
                     ( { model | board =  updatedBoard }
-                    , Firebase.updateBoardToFirebase (encodeBoard updatedBoard)
+                    , Cmd.none
                     )
-                else
-                    ( log "Could not update model with received board" model
+                Err err ->
+                    ( log ("Could not update model with received board" ++ toString err) model
+                    , Cmd.none
+                    )
+        DidUploadBoard val ->
+            case val of
+                False ->
+                    ( log "Failed to upload board to firestore" model
+                    , Cmd.none
+                    )
+                True ->
+                    ( model
                     , Cmd.none
                     )
 
@@ -161,4 +164,5 @@ firebaseSubscriptions : Model -> Sub Msg
 firebaseSubscriptions model =
   Sub.batch
     [ Firebase.updateBoardFromFirebase GetBoard
+    , Firebase.didUploadBoard DidUploadBoard
     ]

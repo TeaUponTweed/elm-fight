@@ -5,10 +5,6 @@ import Debug exposing (log, toString)
 import Dict exposing (Dict)
 
 import Html exposing (Html, text, div)
-
---import Html exposing (..)
---import Html.Events exposing (..)
---import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
 
 import Json.Decode as Decode
@@ -19,11 +15,6 @@ import Svg.Attributes exposing (..)
 
 import Firebase
 
-import Material
-import Material.Button as Button
-import Material.Options as Options
-
-port localStorage : String -> Cmd msg
 
 main =
     Browser.element

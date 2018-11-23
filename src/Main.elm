@@ -8,7 +8,6 @@ import Url.Parser as Parser exposing (Parser, (</>), custom, fragment, map, oneO
 
 import Board
 import Lobby
-import Session
 
 
 -- MAIN

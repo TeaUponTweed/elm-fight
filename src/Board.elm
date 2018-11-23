@@ -1,3 +1,5 @@
+module Board exposing (init, update, view, Msg, Model)
+
 import Browser
 
 import Debug exposing (log, toString)
@@ -33,12 +35,13 @@ type alias Model =
     , nrows : Int
     , ncols : Int
     , npixels : Int
+    , gameID: String
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( Model Dict.empty 10 10 50
+init : String -> ( Model, Cmd Msg )
+init gameID =
+    ( Model Dict.empty 10 10 50 gameID
     , Cmd.none
     )
 
@@ -148,13 +151,6 @@ view model =
         [ svg
             [ width pxwidth, height pxwidth, viewBox ("0 0" ++ " " ++ pxwidth ++ " " ++ pxheight), fill "gray", stroke "black", strokeWidth "0 "]
             (drawBoardSquares model.nrows model.ncols model.npixels model.board 0 [ rect [ x "0", y "0", width pxwidth, height pxheight] [] ])
-        , Button.view Mdc
-            "my-button"
-            model.mdc
-            [ Button.ripple
-            , Options.onClick Click
-            ]
-            [ text "Click me!" ]
         ]
 
 

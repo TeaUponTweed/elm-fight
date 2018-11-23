@@ -1,10 +1,13 @@
 import Browser
+import Browser.Navigation as Nav
 
 import Html
-
+import Html.Attributes as Attributes
 
 import Url
-import Url.Parser as Parser exposing (Parser, (</>), custom, fragment, map, oneOf, s, top)
+import Url.Parser as Parser exposing (Parser, (</>), custom, fragment, map, oneOf, s, top, string)
+
+import List
 
 import Board
 import Lobby
@@ -33,8 +36,7 @@ type alias Model =
   }
 
 type Page
-  = NotFound
-  | Board Board.Model
+  = Board Board.Model
   | Lobby Lobby.Model
 
 
@@ -52,12 +54,18 @@ subscriptions model =
 
 view : Model -> Browser.Document Msg
 view model =
-  case model.page of
-    Lobby lobby ->
-      Browser.Document "Lobby" [ Lobby.view lobby ]
+  let 
+    links =
+      [ Html.li [] [ Html.a [ Attributes.href "/lobby" ] [ Html.text "To Lobby" ] ]
+      , Html.li [] [ Html.a [ Attributes.href "/game/test" ] [ Html.text "To Test Game" ] ]
+      ]
+  in
+    case model.page of
+      Lobby lobby ->
+        Browser.Document "Lobby" <| List.append links [ Html.map LobbyMsg ( Lobby.view lobby ) ]
 
-    Board board ->
-      Browser.Document "Board" [ Board.view board ]
+      Board board ->
+        Browser.Document "Board" <| List.append links [ Html.map BoardMsg ( Board.view board ) ]
 
 -- INIT
 
@@ -65,11 +73,9 @@ view model =
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
   let
-    (lobby, _) = Lobby.init 
-  stepUrl url
-    { key = key
-    , page = lobby
-    }
+    (lobby, _) = Lobby.init ()
+  in
+    stepUrl url (Model key (Lobby lobby))
 
 
 
@@ -144,8 +150,8 @@ stepUrl url model =
         ]
   in
     case Parser.parse parser url of
-      Just GameID gameID ->
+      Just (GameID gameID) ->
         stepBoard model (Board.init gameID)
 
-      Nothing ->
+      _ ->
         stepLobby model (Lobby.init () )

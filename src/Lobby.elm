@@ -1,11 +1,13 @@
 module Lobby exposing (init, update, view, Msg, Model)
 
 import Browser
-import Html exposing (..)
-import Html.Events exposing (..)
+
+import Html
+import Html.Events
+import Html.Attributes
+
 import Random
 import Browser
-import Html.Attributes
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
@@ -31,13 +33,14 @@ main =
 
 
 type alias Model =
-  { currentGames : List String 
+  { currentGames : List String
+  , nextGameNumber : Int
   }
 
 
 init : () -> (Model, Cmd Msg)
 init _ =
-  ( Model ["wakka"]
+  ( Model [] 2
   , Cmd.none
   )
 
@@ -47,7 +50,8 @@ init _ =
 
 
 type Msg
-  = GoToGame
+  = GoToGame String
+  | NewGame
 
 decodeGames : Decode.Decoder (List String)
 decodeGames = 
@@ -57,8 +61,12 @@ decodeGames =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    GoToGame ->
+    GoToGame _ ->
       ( model
+      , Cmd.none
+      )
+    NewGame ->
+      ( {model | nextGameNumber = model.nextGameNumber + 1} 
       , Cmd.none
       )
 
@@ -75,6 +83,11 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> Html.Html Msg
 view model =
-  div [] (List.map (\x -> Html.text x) model.currentGames)
+  Html.div [] (List.append (List.map clickableGame model.currentGames) [ Html.button [ Html.Events.onClick NewGame ] [ text ("New Game " ++ String.fromInt model.nextGameNumber) ] ])
+
+
+clickableGame : String -> Html.Html Msg
+clickableGame gameID = 
+  Html.button [ Html.Events.onClick (GoToGame gameID) ] [ text ("Go To " ++ gameID) ]

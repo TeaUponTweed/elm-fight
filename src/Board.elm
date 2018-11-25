@@ -9,13 +9,8 @@ import Dict exposing (Dict)
 import Html exposing (Html, text, div)
 import Html.Events.Extra.Mouse as Mouse
 
-import Json.Decode as Decode
-import Json.Encode as Encode
-
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-
-import Firebase
 
 
 main =
@@ -48,8 +43,6 @@ init gameID =
 
 type Msg
     = MouseDownAt ( Float, Float )
-    | GetBoard Decode.Value
-    | DidUploadBoard Bool
 
 
 togglePieceImpl : Maybe Bool -> Maybe Bool
@@ -62,20 +55,6 @@ togglePieceImpl val =
 togglePiece : Board -> String -> Board
 togglePiece d k =
     d |> Dict.update k togglePieceImpl
-
-
-decodeBoard : Decode.Decoder (Dict String Bool)
-decodeBoard = 
-    Decode.dict Decode.bool
-
-
-encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
-encodeBoardImpl (key, val) = 
-    (key, Encode.bool val)
-
-encodeBoard : Board -> Encode.Value
-encodeBoard board = 
-    Encode.object(List.map encodeBoardImpl (Dict.toList board))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -91,30 +70,9 @@ update msg model =
                         updatedBoard = togglePiece model.board (String.fromInt (row * model.ncols + col ))
                     in
                         ( { model | board =  updatedBoard}
-                        , Firebase.updateBoardToFirebase (encodeBoard updatedBoard)
+                        , Cmd.none
                         )
                 else
-                    ( model
-                    , Cmd.none
-                    )
-
-        GetBoard board ->
-            case Decode.decodeValue decodeBoard board of
-                Ok updatedBoard ->
-                    ( { model | board =  updatedBoard }
-                    , Cmd.none
-                    )
-                Err err ->
-                    ( log ("Could not update model with received board" ++ toString err) model
-                    , Cmd.none
-                    )
-        DidUploadBoard val ->
-            case val of
-                False ->
-                    ( log "Failed to upload board to firestore" model
-                    , Cmd.none
-                    )
-                True ->
                     ( model
                     , Cmd.none
                     )
@@ -156,12 +114,4 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  firebaseSubscriptions model
-
-
-firebaseSubscriptions : Model -> Sub Msg
-firebaseSubscriptions model =
-  Sub.batch
-    [ Firebase.updateBoardFromFirebase GetBoard
-    , Firebase.didUploadBoard DidUploadBoard
-    ]
+  Sub.none

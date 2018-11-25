@@ -1,3 +1,8 @@
+port module Main exposing (getGamesFromFirebase)
+
+import Json.Decode as Decode
+import Json.Encode as Encode
+
 import Browser
 import Browser.Navigation as Nav
 
@@ -9,6 +14,10 @@ import List
 import Board
 import Lobby
 
+--port updateBoardFromFirebase : (Decode.Value -> msg) -> Sub msg
+port getGamesFromFirebase : (Decode.Value -> msg) -> Sub msg
+
+--port updateBoardToFirebase : Decode.Value -> Cmd msg
 
 -- MAIN
 
@@ -22,16 +31,15 @@ main =
         , subscriptions = subscriptions
         }
 
+
 -- MODEL
 
 
 type alias Model =
-  { page : Page
+  { board : Maybe Board.Model
+  , lobby : Lobby.Model
+  , page : CurrentPage
   }
-
-type Page
-  = Board Board.Model
-  | Lobby Lobby.Model
 
 
 -- SUBSCRIPTIONS
@@ -39,7 +47,7 @@ type Page
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+  firebaseSubscriptions model
 
 
 
@@ -49,11 +57,15 @@ subscriptions model =
 view : Model -> Html.Html Msg
 view model =
     case model.page of
-      Lobby lobby ->
-        Html.map LobbyMsg (Lobby.view lobby)
+      InLobby ->
+        Html.map LobbyMsg (Lobby.view model.lobby)
 
-      Board board ->
-         Html.map BoardMsg (Board.view board)
+      InGame ->
+        case model.board of
+          Just board ->
+            Html.map BoardMsg (Board.view board)
+          Nothing ->
+            Html.div [] [ Html.text "Board not instantiated" ]
 
 -- INIT
 
@@ -63,7 +75,7 @@ init _ =
   let
     (lobby, _) = Lobby.init ()
   in
-    (Model (Lobby lobby)
+    ( Model Nothing lobby InLobby
     , Cmd.none
     )
 
@@ -71,13 +83,18 @@ init _ =
 
 -- UPDATE
 
+type CurrentPage
+  = InLobby
+  | InGame
+
 
 type Msg
   = GoToLobby
   | GoToBoard String
   | BoardMsg Board.Msg
   | LobbyMsg Lobby.Msg
-
+  | DecodeActiveGamesList Decode.Value
+  --| ActiveGames (List String)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
@@ -87,24 +104,67 @@ update message model =
     GoToBoard gameID ->
       stepBoard model (Board.init gameID)
     BoardMsg msg ->
-      case model.page of
-        Board board -> stepBoard model (Board.update msg board)
-        _         -> ( model, Cmd.none )
+      case model.board of
+        Just board ->
+          stepBoard model (Board.update msg board)
+        Nothing ->
+          ( model, Cmd.none )
 
     LobbyMsg msg ->
-      case model.page of
-        Lobby lobby -> stepLobby model (Lobby.update msg lobby)
-        _         -> ( model, Cmd.none )
+      stepLobby model (Lobby.update msg model.lobby)
+
+    DecodeActiveGamesList gamesList ->
+      case Decode.decodeValue decodeActiveGamesList gamesList of
+          Ok decodedGamesList ->
+            let
+              lobby =
+                model.lobby
+              newLobby =
+                {lobby | currentGames = decodedGamesList}  
+            in
+              ( { model | lobby = newLobby }
+              , Cmd.none
+              )
+          Err err ->
+              ( model
+              , Cmd.none
+              )
+
 
 stepBoard : Model -> ( Board.Model, Cmd Board.Msg ) -> ( Model, Cmd Msg )
-stepBoard model (board, cmds) =
-  ( { model | page = Board board }
+stepBoard model (b, cmds) =
+  ( { model | board = Just b }
   , Cmd.map BoardMsg cmds
   )
 
 
 stepLobby : Model -> ( Lobby.Model, Cmd Lobby.Msg ) -> ( Model, Cmd Msg )
-stepLobby model (lobby, cmds) =
-  ( { model | page = Lobby lobby }
+stepLobby model (l, cmds) =
+  ( { model | lobby =  l }
   , Cmd.map LobbyMsg cmds
   )
+
+decodeActiveGamesList : Decode.Decoder (List String)
+decodeActiveGamesList = 
+    Decode.list Decode.string
+
+firebaseSubscriptions : Model -> Sub Msg
+firebaseSubscriptions model =
+  Sub.batch
+    [ getGamesFromFirebase DecodeActiveGamesList
+    --, Firebase.updateBoardFromFirebase GetBoard
+    --, Firebase.didUploadBoard DidUploadBoard
+    ]
+
+--decodeBoard : Decode.Decoder (Dict String Bool)
+--decodeBoard = 
+--    Decode.dict Decode.bool
+
+
+--encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
+--encodeBoardImpl (key, val) = 
+--    (key, Encode.bool val)
+
+--encodeBoard : Board -> Encode.Value
+--encodeBoard board = 
+--    Encode.object(List.map encodeBoardImpl (Dict.toList board))

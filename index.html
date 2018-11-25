@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html>
 <head>
   <meta charset="UTF-8">
@@ -8,67 +8,66 @@
   <script src="elm.js"></script>
 </head>
 
-  <script src="https://www.gstatic.com/firebasejs/5.5.8/firebase.js"></script>
+<script src="https://www.gstatic.com/firebasejs/5.5.8/firebase.js"></script>
+
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyDCtMMZovJXoBaJfvMho1_8ySjxQKyl2t4",
+    authDomain: "elm-fight.firebaseapp.com",
+    databaseURL: "https://elm-fight.firebaseio.com",
+    projectId: "elm-fight",
+    storageBucket: "elm-fight.appspot.com",
+    messagingSenderId: "894465552065"
+  };
+
+  firebase.initializeApp(config);
+</script>
 
 
+<body>
+  <div id="elm"></div>
   <script>
-    // Initialize Firebase
-    var config = {
-      apiKey: "AIzaSyDCtMMZovJXoBaJfvMho1_8ySjxQKyl2t4",
-      authDomain: "elm-fight.firebaseapp.com",
-      databaseURL: "https://elm-fight.firebaseio.com",
-      projectId: "elm-fight",
-      storageBucket: "elm-fight.appspot.com",
-      messagingSenderId: "894465552065"
-    };
+  var app = Elm.Main.init({
+    node: document.getElementById('elm')
+  });
 
-    firebase.initializeApp(config);
-  </script>
+  var firestore = firebase.firestore()
+  const settings = {timestampsInSnapshots: true};
+  firestore.settings(settings);
 
-  <body>
-    <div id="elm"></div>
-    <script>
-
-    var app = Elm.Main.init({
-      node: document.getElementById('elm')
-    });
-
-    var firestore = firebase.firestore()
-    const settings = {timestampsInSnapshots: true};
-    firestore.settings(settings);
-
-    function updateBoard(board) {
-      var boardRef = firestore.collection('board').doc('test')
-      boardRef.set({'set_pieces': board}).then(() => {
-        console.log('Uploaded board to firestore')
-      }).catch(function (error) {
-        console.log('Failed to upload board to firestore ', error)
-      })
-    }
-    console.log('ere')
-    console.log(app.ports)
-    console.log('ere')
-    app.ports.updateBoardToFirebase.subscribe(function(board) {
-      console.log(board)
-      updateBoard(board)
+  function updateBoard(board) {
+    var boardRef = firestore.collection('board').doc('test')
+    boardRef.set({'set_pieces': board}).then(() => {
+      console.log('Uploaded board to firestore')
+    }).catch(function (error) {
+      console.log('Failed to upload board to firestore ', error)
     })
+  }
+  console.log(app.ports)
+  // app.ports.updateBoardToFirebase.subscribe(function(board) {
+  //   console.log(board)
+  //   updateBoard(board)
+  // })
 
-    firestore.collection('board').doc('test')
-      .onSnapshot(function(doc) {
-          // console.log("Current data: ", doc.data());
-          app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
-      });
-
-    firestore.collection("board").get().then(function(querySnapshot) {
-        var current_games = []
-        querySnapshot.forEach(function(doc) {
-            // doc.data() is never undefined for query doc snapshots
-            // console.log(doc.id, " => ", doc.data());
-            current_games.push(doc.id())
-        });
-        app.ports.getGamesFromFirebase.send(current_games)
+  // firestore.collection('board').doc('test')
+  //   .onSnapshot(function(doc) {
+  //       console.log("Current data: ", doc.data());
+  //       app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
+  //   });
+  firestore.collection("board").get().then((querySnapshot) => {
+    var games = []
+    querySnapshot.forEach((doc) => {
+        // doc.data() is never undefined for query doc snapshots
+        // console.log(doc.id, " => ", doc.data());
+        games.push(doc.id)
     });
+    console.log(games)
+    console.log(app.ports)
 
-    </script>
-  </body>
+    app.ports.getGamesFromFirebase.send(games)
+});
+
+  </script>
+</body>
 </html>

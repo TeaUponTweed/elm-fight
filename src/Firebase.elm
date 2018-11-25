@@ -1,8 +1,9 @@
-port module Firebase exposing (..)
+port module Firebase exposing (updateBoardToFirebase, didUploadBoard, updateBoardFromFirebase, getGamesFromFirebase)
 
-import Json.Decode exposing (Value)
+import Json.Decode as D
 
-port updateBoardToFirebase : Value -> Cmd msg
+port updateBoardFromFirebase : (D.Value -> msg) -> Sub msg
 port didUploadBoard : (Bool -> msg) -> Sub msg
+port getGamesFromFirebase : (D.Value -> msg) -> Sub msg
 
-port updateBoardFromFirebase : (Value -> msg) -> Sub msg
+port updateBoardToFirebase : D.Value -> Cmd msg

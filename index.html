@@ -61,9 +61,20 @@
 
     firestore.collection('board').doc('test')
       .onSnapshot(function(doc) {
-          console.log("Current data: ", doc.data());
+          // console.log("Current data: ", doc.data());
           app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
       });
+
+    firestore.collection("board").get().then(function(querySnapshot) {
+        var current_games = []
+        querySnapshot.forEach(function(doc) {
+            // doc.data() is never undefined for query doc snapshots
+            // console.log(doc.id, " => ", doc.data());
+            current_games.push(doc.id())
+        });
+        app.ports.getGamesFromFirebase.send(current_games)
+    });
+
     </script>
   </body>
 </html>

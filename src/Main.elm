@@ -11,6 +11,7 @@ import Html.Attributes as Attributes
 
 import List
 
+import Router
 import Board
 import Lobby
 
@@ -73,7 +74,7 @@ view model =
 init : () -> ( Model, Cmd Msg )
 init _ =
   let
-    (lobby, _) = Lobby.init ()
+    (lobby, _, _) = Lobby.init ()
   in
     ( Model Nothing lobby InLobby
     , Cmd.none
@@ -89,8 +90,7 @@ type CurrentPage
 
 
 type Msg
-  = GoToLobby
-  | GoToBoard String
+  = RouterMsg (Maybe Router.Msg)
   | BoardMsg Board.Msg
   | LobbyMsg Lobby.Msg
   | DecodeActiveGamesList Decode.Value
@@ -99,10 +99,17 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
   case message of
-    GoToLobby ->
-      stepLobby model (Lobby.init ())
-    GoToBoard gameID ->
-      stepBoard model (Board.init gameID)
+    RouterMsg msg ->
+      case msg of
+        Just Router.GoToLobby ->
+          stepLobby { model | page = InLobby } (Lobby.init ())
+        Just (Router.GoToGame gameID) ->
+          stepBoard { model | page = InGame } (Board.init gameID)
+        Nothing ->
+          ( model
+          , Cmd.none
+          )
+
     BoardMsg msg ->
       case model.board of
         Just board ->
@@ -131,18 +138,32 @@ update message model =
               )
 
 
-stepBoard : Model -> ( Board.Model, Cmd Board.Msg ) -> ( Model, Cmd Msg )
-stepBoard model (b, cmds) =
-  ( { model | board = Just b }
-  , Cmd.map BoardMsg cmds
-  )
+stepBoard : Model -> ( Board.Model, Cmd Board.Msg, Maybe Router.Msg ) -> ( Model, Cmd Msg )
+stepBoard model ( b, cmds, routerMsg ) =
+  let
+    updatedModel = { model | board = Just b }
+  in
+  case routerMsg of
+    Just rMsg ->
+      update (RouterMsg (Just rMsg)) updatedModel
+    Nothing ->
+      ( updatedModel
+      , (Cmd.map BoardMsg cmds)
+      )
 
 
-stepLobby : Model -> ( Lobby.Model, Cmd Lobby.Msg ) -> ( Model, Cmd Msg )
-stepLobby model (l, cmds) =
-  ( { model | lobby =  l }
-  , Cmd.map LobbyMsg cmds
-  )
+stepLobby : Model -> ( Lobby.Model, Cmd Lobby.Msg, Maybe Router.Msg ) -> ( Model, Cmd Msg )
+stepLobby model (l, cmds, routerMsg) =
+  let
+    updatedModel = { model | lobby =  l }
+  in
+    case routerMsg of
+      Just rMsg ->
+        update (RouterMsg (Just rMsg)) updatedModel
+      Nothing ->
+        ( updatedModel
+        , (Cmd.map LobbyMsg cmds)
+        )
 
 decodeActiveGamesList : Decode.Decoder (List String)
 decodeActiveGamesList = 

@@ -1,7 +1,5 @@
 module Board exposing (init, update, view, Msg, Model)
 
-import Browser
-
 import Debug exposing (log, toString)
 
 import Dict exposing (Dict)
@@ -12,14 +10,8 @@ import Html.Events.Extra.Mouse as Mouse
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 
+import Router
 
-main =
-    Browser.element
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
 
 
 type alias Board = Dict String Bool
@@ -34,10 +26,11 @@ type alias Model =
     }
 
 
-init : String -> ( Model, Cmd Msg )
+init : String -> ( Model, Cmd Msg , Maybe Router.Msg )
 init gameID =
     ( Model Dict.empty 10 10 50 gameID
     , Cmd.none
+    , Nothing
     )
 
 
@@ -57,7 +50,7 @@ togglePiece d k =
     d |> Dict.update k togglePieceImpl
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd Msg, Maybe Router.Msg )
 update msg model =
     case msg of
         MouseDownAt (x, y) ->
@@ -71,10 +64,12 @@ update msg model =
                     in
                         ( { model | board =  updatedBoard}
                         , Cmd.none
+                        , Nothing
                         )
                 else
                     ( model
                     , Cmd.none
+                    , Nothing
                     )
 
 

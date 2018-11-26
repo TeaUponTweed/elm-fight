@@ -1,7 +1,5 @@
 module Lobby exposing (init, update, view, Msg, Model)
 
-import Browser
-
 import Html
 import Html.Events
 import Html.Attributes
@@ -15,18 +13,7 @@ import Svg.Attributes exposing (..)
 import Json.Decode as Decode
 import Json.Encode as Encode
 
-
--- MAIN
-
-
-main =
-  Browser.element
-    { init = init
-    , update = update
-    , subscriptions = subscriptions
-    , view = view
-    }
-
+import Router
 
 
 -- MODEL
@@ -38,10 +25,11 @@ type alias Model =
   }
 
 
-init : () -> (Model, Cmd Msg)
+init : () -> (Model, Cmd Msg, Maybe Router.Msg)
 init _ =
   ( Model [] 2
   , Cmd.none
+  , Nothing
   )
 
 
@@ -58,16 +46,18 @@ decodeGames =
     Decode.list Decode.string
 
 
-update : Msg -> Model -> (Model, Cmd Msg)
+update : Msg -> Model -> (Model, Cmd Msg, Maybe Router.Msg)
 update msg model =
   case msg of
-    GoToGame _ ->
+    GoToGame gameID ->
       ( model
       , Cmd.none
+      , Just (Router.GoToGame gameID)
       )
     NewGame ->
       ( {model | nextGameNumber = model.nextGameNumber + 1} 
       , Cmd.none
+      , Nothing
       )
 
 

@@ -202,14 +202,24 @@ update message model =
 stepBoard : Model -> ( Board.Model, Cmd Board.Msg, Maybe Router.Msg ) -> ( Model, Cmd Msg )
 stepBoard model ( b, cmds, routerMsg ) =
     let
-        updatedModel = { model | board = Just b }
+        updatedModel =
+            { model | board = Just b }
+        boardUpdateCmd =
+            updateBoardToFirebase (encodeGame b)
     in
     case routerMsg of
         Just rMsg ->
-            update (RouterMsg (Just rMsg)) updatedModel
+            let
+                ( moreUpdatedModel, moreCmds ) =
+                    update (RouterMsg (Just rMsg)) updatedModel
+            in
+                ( moreUpdatedModel
+                , Cmd.batch [boardUpdateCmd, moreCmds]
+                )
+    
         Nothing ->
             ( updatedModel
-            , updateBoardToFirebase (encodeGame b)
+            , boardUpdateCmd
             )
 
 

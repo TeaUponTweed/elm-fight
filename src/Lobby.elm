@@ -6,8 +6,6 @@ import Html.Attributes
 
 import Random
 import Browser
-import Svg exposing (..)
-import Svg.Attributes exposing (..)
 
 
 import Json.Decode as Decode
@@ -77,10 +75,10 @@ view model =
     Html.div []
         ( List.append 
             ( List.map clickableGame model.currentGames )
-            [ Html.button [ Html.Events.onClick NewGame ] [ text "Start New Game" ] ]
+            [ Html.button [ Html.Events.onClick NewGame ] [ Html.text "Start New Game" ] ]
         )
 
 
 clickableGame : String -> Html.Html Msg
 clickableGame gameID = 
-    Html.button [ Html.Events.onClick (GoToGame gameID) ] [ text ("Go To " ++ gameID) ]
+    Html.button [ Html.Events.onClick (GoToGame gameID) ] [ Html.text ("Go To " ++ gameID) ]

@@ -74,8 +74,10 @@
   });
 
   // create new game
-  firestore.collection("board").add({
-    'set_pieces': {}
+  app.ports.createNewGame.subscribe((data) => {
+    firestore.collection("board").add({
+      'set_pieces': {}
+    })
   })
 
   </script>

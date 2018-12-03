@@ -4,7 +4,9 @@ import Debug exposing (log, toString)
 
 import Dict exposing (Dict)
 
-import Html exposing (Html, text, div)
+import Html
+import Html.Events
+import Html.Attributes
 import Html.Events.Extra.Mouse as Mouse
 
 import Svg exposing (..)
@@ -22,7 +24,7 @@ type alias Model =
     , nrows : Int
     , ncols : Int
     , npixels : Int
-    , gameID: String
+    , gameID : String
     }
 
 
@@ -36,6 +38,7 @@ init gameID =
 
 type Msg
     = MouseDownAt ( Float, Float )
+    | GoToLobby
 
 
 togglePieceImpl : Maybe Bool -> Maybe Bool
@@ -72,6 +75,12 @@ update msg model =
                     , Nothing
                     )
 
+        GoToLobby ->
+            ( model
+            , Cmd.none
+            , Just Router.GoToLobby
+            )
+
 
 drawBoardSquares : Int -> Int -> Int -> Board -> Int -> List (Svg Msg) -> List (Svg Msg)
 drawBoardSquares nrows ncols npixels board key squares =
@@ -94,16 +103,19 @@ drawCircle x y radius color =
     circle [ cx (String.fromInt x), cy (String.fromInt y), r (String.fromInt radius), fill color] []
 
 
-view : Model -> Html Msg
+view : Model -> Html.Html Msg
 view model =
     let
         pxwidth  = String.fromInt (model.ncols * model.npixels)
         pxheight = String.fromInt (model.nrows * model.npixels)
     in
-      div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
-        [ svg
-            [ width pxwidth, height pxwidth, viewBox ("0 0" ++ " " ++ pxwidth ++ " " ++ pxheight), fill "gray", stroke "black", strokeWidth "0 "]
-            (drawBoardSquares model.nrows model.ncols model.npixels model.board 0 [ rect [ x "0", y "0", width pxwidth, height pxheight] [] ])
+        Html.div []
+        [ Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
+            [svg
+                [ width pxwidth, height pxwidth, viewBox ("0 0" ++ " " ++ pxwidth ++ " " ++ pxheight), fill "gray", stroke "black", strokeWidth "0 "]
+                (drawBoardSquares model.nrows model.ncols model.npixels model.board 0 [ rect [ x "0", y "0", width pxwidth, height pxheight] [] ])
+            ]
+        , Html.div [] [Html.button [ Html.Events.onClick GoToLobby ] [ Html.text "Lobby" ]]
         ]
 
 

@@ -28,9 +28,9 @@ type alias Model =
     }
 
 
-init : String -> ( Model, Cmd Msg , Maybe Router.Msg )
-init gameID =
-    ( Model Dict.empty 10 10 50 gameID
+init : String -> Board -> ( Model, Cmd Msg , Maybe Router.Msg )
+init gameID board =
+    ( Model board 10 10 50 gameID
     , Cmd.none
     , Nothing
     )
@@ -110,7 +110,8 @@ view model =
         pxheight = String.fromInt (model.nrows * model.npixels)
     in
         Html.div []
-        [ Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
+        [ Html.div [] [Html.text <| "Game " ++ model.gameID ]
+        , Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
             [svg
                 [ width pxwidth, height pxwidth, viewBox ("0 0" ++ " " ++ pxwidth ++ " " ++ pxheight), fill "gray", stroke "black", strokeWidth "0 "]
                 (drawBoardSquares model.nrows model.ncols model.npixels model.board 0 [ rect [ x "0", y "0", width pxwidth, height pxheight] [] ])

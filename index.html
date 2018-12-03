@@ -45,21 +45,23 @@
       console.log('Failed to upload board to firestore ', error)
     })
   }
-  // send boards to firebase
+
+  function getBoardFromFirebase(gameID) {
+    console.log("Subscribing to updated from " + gameID)
+    firestore.collection('board').doc(gameID)
+      .onSnapshot((doc) => {
+        app.ports.updateBoardFromFirebase.send({
+          'set_pieces': doc.data()['set_pieces'],
+          'gameID': doc.id
+        })
+      })
+  }
+
+  // send board to firebase
   app.ports.updateBoardToFirebase.subscribe(function(data) {
     board = data['board']
     gameID = data['gameID']
-    // Send board to firebase
     updateBoard(gameID, board)
-    // Subscribe to future updates
-    if (lastGameID !== gameID) {
-      console.log("Subscribing to updated from " + gameID)
-      firestore.collection('board').doc(gameID)
-        .onSnapshot(function(doc) {
-            app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
-        });
-      lastGameID = gameID
-    }
   })
 
   // list games
@@ -72,12 +74,25 @@
     });
     app.ports.getGamesFromFirebase.send(games)
   });
-
+  app.ports.requestBoardFromFirebase.subscribe((gameID) => {
+    getBoardFromFirebase(gameID)
+  })
   // create new game
   app.ports.createNewGame.subscribe((data) => {
-    firestore.collection("board").add({
+    var board = {
       'set_pieces': {}
+    }
+    firestore.collection("board").add(board)
+    .then((doc) => {
+        console.log("Document written with ID: ", doc.id);
+        // lastGameID = doc.id
+        board['gameID'] = doc.id
+        app.ports.updateBoardFromFirebase.send(board)
+        
     })
+    .catch((error) => {
+        console.error("Error adding document: ", error);
+    });
   })
 
   </script>

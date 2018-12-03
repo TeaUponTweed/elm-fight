@@ -1,4 +1,4 @@
-port module Main exposing (updateBoardFromFirebase, getGamesFromFirebase, getNewGameID, updateBoardToFirebase, createNewGame)
+port module Main exposing (updateBoardFromFirebase, getGamesFromFirebase, updateBoardToFirebase, createNewGame)
 
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -9,6 +9,8 @@ import Browser.Navigation as Nav
 import Html
 import Html.Attributes as Attributes
 
+import Debug
+
 import List
 import Dict
 
@@ -17,9 +19,10 @@ import Board
 import Lobby
 
 port updateBoardFromFirebase : (Decode.Value -> msg) -> Sub msg
+-- TODO only do this on request
 port getGamesFromFirebase : (Decode.Value -> msg) -> Sub msg
-port getNewGameID : (Decode.Value -> msg) -> Sub msg
 
+port requestBoardFromFirebase : Decode.Value -> Cmd msg
 port updateBoardToFirebase : Decode.Value -> Cmd msg
 port createNewGame : Decode.Value -> Cmd msg
 
@@ -42,7 +45,6 @@ main =
 type alias Model =
     { board : Maybe Board.Model
     , lobby : Lobby.Model
-    , page : CurrentPage
     }
 
 
@@ -60,16 +62,12 @@ subscriptions model =
 
 view : Model -> Html.Html Msg
 view model =
-    case model.page of
-        InLobby ->
+    case model.board of
+        Just board ->
+            Html.map BoardMsg (Board.view board)
+        Nothing ->
             Html.map LobbyMsg (Lobby.view model.lobby)
 
-        InGame ->
-            case model.board of
-                Just board ->
-                    Html.map BoardMsg (Board.view board)
-                Nothing ->
-                    Html.div [] [ Html.text "Board not instantiated" ]
 
 -- INIT
 
@@ -79,7 +77,7 @@ init _ =
     let
         (lobby, _, _) = Lobby.init ()
     in
-        ( Model Nothing lobby InLobby
+        ( Model Nothing lobby
         , Cmd.none
         )
 
@@ -87,9 +85,6 @@ init _ =
 
 -- UPDATE
 
-type CurrentPage
-    = InLobby
-    | InGame
 
 
 type Msg
@@ -98,8 +93,6 @@ type Msg
     | LobbyMsg Lobby.Msg
     | DecodeActiveGamesList Decode.Value
     | DecodeBoard Decode.Value
-    | DecodeGameID Decode.Value
-    --| ActiveGames (List String)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update message model =
@@ -107,11 +100,17 @@ update message model =
         RouterMsg msg ->
             case msg of
                 Just Router.GoToLobby ->
-                    stepLobby { model | page = InLobby } (Lobby.init ())
+                    ( {model | board = Nothing }
+                    , Cmd.none
+                    )
                 Just (Router.GoToGame gameID) ->
-                    stepBoard { model | page = InGame } (Board.init gameID)
+                    ( model
+                    , requestBoardFromFirebase (Encode.string gameID)
+                    )
                 Just Router.CreateNewGame ->
-                    stepBoard { model | page = InGame } (Board.init "Pending")
+                    ( model
+                    , createNewGame Encode.null
+                    )
                 Nothing ->
                     ( model
                     , Cmd.none
@@ -143,57 +142,31 @@ update message model =
                     ( model
                     , Cmd.none
                     )
-
+        -- TODO let board handle it's own updating, don't reach in
         DecodeBoard codedBoard ->
-            case Decode.decodeValue decodeBoard codedBoard of
+            case Decode.decodeValue decodeBoard (Debug.log ("coded board: " ++ (Debug.toString codedBoard)) codedBoard) of
                 Ok {board, gameID} ->
-                    let
-                        boardState =
-                            model.board
-                    in
-                        case boardState of
-                            Just game ->
-                                let
-                                    updatedGame =
-                                        {game | board = board, gameID = gameID}
-                                in
-                                    ( { model | board = Just updatedGame }
-                                    , Cmd.none
-                                    )
-                            Nothing ->
-                                ( model
+                    case model.board of
+                        Just game ->
+                            let
+                                updatedGame =
+                                    {game | board = board, gameID = gameID}
+                            in
+                                ( { model | board = Just updatedGame }
                                 , Cmd.none
                                 )
 
-                Err err ->
-                    ( model
-                    , Cmd.none
-                    )
-
-        DecodeGameID gameID ->
-            case Decode.decodeValue Decode.string gameID of
-                Ok gid ->
-                    let
-                        boardState =
-                            model.board
-                    in
-                        case boardState of
-                            Just board ->
-                                let
-                                    newBoard =
-                                        {board | gameID = gid}
-                                in
-                                    ( { model | board = Just newBoard }
-                                    , Cmd.none
-                                    )
-
-                            Nothing ->
-                                ( model
-                                , Cmd.none
+                        Nothing ->
+                            let
+                                (newGame, cmds, _) =
+                                    Board.init gameID board
+                            in
+                                ( { model | board = Just newGame }
+                                , Cmd.map BoardMsg cmds
                                 )
 
                 Err err ->
-                    ( model
+                    ( Debug.log ("failed to decode board: " ++ Debug.toString err)  model
                     , Cmd.none
                     )
 
@@ -226,7 +199,7 @@ stepBoard model ( b, cmds, routerMsg ) =
 stepLobby : Model -> ( Lobby.Model, Cmd Lobby.Msg, Maybe Router.Msg ) -> ( Model, Cmd Msg )
 stepLobby model (l, cmds, routerMsg) =
     let
-        updatedModel = { model | lobby =  l }
+        updatedModel = { lobby =  l, board = Nothing }
     in
         case routerMsg of
             Just rMsg ->
@@ -247,7 +220,6 @@ firebaseSubscriptions model =
     Sub.batch
         [ getGamesFromFirebase DecodeActiveGamesList
         , updateBoardFromFirebase DecodeBoard
-        , getNewGameID DecodeGameID
         ]
 
 type alias DecodedBoard =
@@ -257,7 +229,9 @@ type alias DecodedBoard =
 
 decodeBoard : Decode.Decoder DecodedBoard
 decodeBoard = 
-    Decode.map2 DecodedBoard (Decode.dict Decode.bool) (Decode.string)
+    Decode.map2 DecodedBoard
+        (Decode.field "set_pieces" (Decode.dict Decode.bool))
+        (Decode.field "gameID" Decode.string)
 
 
 encodeBoardImpl : (String, Bool) -> (String, Encode.Value)

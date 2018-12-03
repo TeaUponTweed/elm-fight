@@ -34,39 +34,49 @@
 
   var firestore = firebase.firestore()
   const settings = {timestampsInSnapshots: true};
+  var lastGameID = null
   firestore.settings(settings);
 
-  function updateBoard(board) {
-    var boardRef = firestore.collection('board').doc('test')
+  function updateBoard(gameID, board) {
+    var boardRef = firestore.collection('board').doc(gameID)
     boardRef.set({'set_pieces': board}).then(() => {
       console.log('Uploaded board to firestore')
     }).catch(function (error) {
       console.log('Failed to upload board to firestore ', error)
     })
   }
-  console.log(app.ports)
-  // app.ports.updateBoardToFirebase.subscribe(function(board) {
-  //   console.log(board)
-  //   updateBoard(board)
-  // })
+  // send boards to firebase
+  app.ports.updateBoardToFirebase.subscribe(function(data) {
+    board = data['board']
+    gameID = data['gameID']
+    // Send board to firebase
+    updateBoard(gameID, board)
+    // Subscribe to future updates
+    if (lastGameID !== gameID) {
+      console.log("Subscribing to updated from " + gameID)
+      firestore.collection('board').doc(gameID)
+        .onSnapshot(function(doc) {
+            app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
+        });
+      lastGameID = gameID
+    }
+  })
 
-  // firestore.collection('board').doc('test')
-  //   .onSnapshot(function(doc) {
-  //       console.log("Current data: ", doc.data());
-  //       app.ports.updateBoardFromFirebase.send(doc.data()['set_pieces'])
-  //   });
+  // list games
   firestore.collection("board").get().then((querySnapshot) => {
     var games = []
     querySnapshot.forEach((doc) => {
-        // doc.data() is never undefined for query doc snapshots
-        // console.log(doc.id, " => ", doc.data());
-        games.push(doc.id)
+      // doc.data() is never undefined for query doc snapshots
+      // console.log(doc.id, " => ", doc.data());
+      games.push(doc.id)
     });
-    console.log(games)
-    console.log(app.ports)
-
     app.ports.getGamesFromFirebase.send(games)
-});
+  });
+
+  // create new game
+  firestore.collection("board").add({
+    'set_pieces': {}
+  })
 
   </script>
 </body>

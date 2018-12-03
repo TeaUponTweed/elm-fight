@@ -20,17 +20,16 @@ import Router
 
 
 type alias Model =
-  { currentGames : List String
-  , nextGameNumber : Int
-  }
+    { currentGames : List String
+    }
 
 
 init : () -> (Model, Cmd Msg, Maybe Router.Msg)
 init _ =
-  ( Model [] 2
-  , Cmd.none
-  , Nothing
-  )
+    ( Model []
+    , Cmd.none
+    , Nothing
+    )
 
 
 
@@ -38,8 +37,8 @@ init _ =
 
 
 type Msg
-  = GoToGame String
-  | NewGame
+    = GoToGame String
+    | NewGame
 
 decodeGames : Decode.Decoder (List String)
 decodeGames = 
@@ -48,17 +47,17 @@ decodeGames =
 
 update : Msg -> Model -> (Model, Cmd Msg, Maybe Router.Msg)
 update msg model =
-  case msg of
-    GoToGame gameID ->
-      ( model
-      , Cmd.none
-      , Just (Router.GoToGame gameID)
-      )
-    NewGame ->
-      ( {model | nextGameNumber = model.nextGameNumber + 1} 
-      , Cmd.none
-      , Nothing
-      )
+    case msg of
+        GoToGame gameID ->
+            ( model
+            , Cmd.none
+            , Just (Router.GoToGame gameID)
+            )
+        NewGame ->
+            ( model
+            , Cmd.none
+            , Just Router.CreateNewGame
+            )
 
 
 -- SUBSCRIPTIONS
@@ -66,7 +65,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-  Sub.none
+    Sub.none
 
 
 
@@ -75,9 +74,13 @@ subscriptions model =
 
 view : Model -> Html.Html Msg
 view model =
-  Html.div [] (List.append (List.map clickableGame model.currentGames) [ Html.button [ Html.Events.onClick NewGame ] [ text ("New Game " ++ String.fromInt model.nextGameNumber) ] ])
+    Html.div []
+        ( List.append 
+            ( List.map clickableGame model.currentGames )
+            [ Html.button [ Html.Events.onClick NewGame ] [ text "Start New Game" ] ]
+        )
 
 
 clickableGame : String -> Html.Html Msg
 clickableGame gameID = 
-  Html.button [ Html.Events.onClick (GoToGame gameID) ] [ text ("Go To " ++ gameID) ]
+    Html.button [ Html.Events.onClick (GoToGame gameID) ] [ text ("Go To " ++ gameID) ]

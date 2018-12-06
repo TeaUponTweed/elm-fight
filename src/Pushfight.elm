@@ -1,5 +1,5 @@
 --import Browser
---import Debug exposing (log)
+import Debug
 import Dict exposing (Dict)
 import Set exposing (Set)
 --import Html
@@ -13,6 +13,7 @@ import Browser
 import Browser.Events
 import Html
 import Html.Events
+import Html.Events.Extra.Mouse as Mouse
 import Svg
 import Svg.Attributes
 import Json.Decode as Decode
@@ -85,16 +86,16 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     let
         startingPieces =
-            [ ( (2, 3), Piece Mover  White )
-            , ( (0, 4), Piece Pusher White )
-            , ( (1, 4), Piece Mover  White )
-            , ( (2, 4), Piece Pusher White )
-            , ( (3, 4), Piece Pusher White )
-            , ( (0, 5), Piece Pusher Black )
-            , ( (1, 5), Piece Mover  Black )
-            , ( (2, 5), Piece Pusher Black )
-            , ( (3, 5), Piece Pusher Black )
-            , ( (2, 6), Piece Mover  Black )
+            [ ( (3, 2), Piece Mover  White )
+            , ( (4, 0), Piece Pusher White )
+            , ( (4, 1), Piece Mover  White )
+            , ( (4, 2), Piece Pusher White )
+            , ( (4, 3), Piece Pusher White )
+            , ( (5, 0), Piece Pusher Black )
+            , ( (5, 1), Piece Mover  Black )
+            , ( (5, 2), Piece Pusher Black )
+            , ( (5, 3), Piece Pusher Black )
+            , ( (6, 2), Piece Mover  Black )
             ] |> Dict.fromList
     in
         ( Model startingPieces Nothing Nothing Nothing
@@ -110,6 +111,7 @@ type Msg
     = DragStart Position
     | DragAt Position
     | DragEnd Position
+    | MouseDownAt (Float, Float)
 
 
 
@@ -130,7 +132,33 @@ update msg model =
             ( handleDragEnd { model | dragState = Just pos }
             , Cmd.none
             )
+        MouseDownAt (x, y) ->
+            ( handleClick model (fromPxToGrid x, fromPxToGrid y)
+            , Cmd.none
+            )
 
+popPiece : PositionKey -> Board -> (Board, Maybe Piece)
+popPiece key board = 
+    case Dict.get key board of
+        Just piece ->
+            (Dict.remove key board, Just piece)
+        Nothing ->
+            (board, Nothing)
+
+handleClick : Model -> PositionKey -> Model
+handleClick model (x, y) =
+    let
+        (newBoard, maybePiece) = popPiece (x, y) model.board
+        movingPiece = case
+            maybePiece of
+                Just piece ->
+                     Just <| MovingPiece piece (Position x y)
+                Nothing ->
+                    Nothing
+
+        updatedModel = { model | board = newBoard, lastMovedPiece = movingPiece}
+    in
+        Debug.log ("handleClick " ++ (Debug.toString updatedModel.lastMovedPiece)) updatedModel
 
 handleDragEnd : Model -> Model
 handleDragEnd model =
@@ -239,7 +267,7 @@ subscriptions model =
                 ]
 
 drawPiece : Int -> (PositionKey, Piece) -> List (Svg.Svg Msg)
-drawPiece size ( (y, x), {kind, color} ) =
+drawPiece size ( (x, y), {kind, color} ) =
     let
         colorString =
             case color of
@@ -254,11 +282,17 @@ drawPiece size ( (y, x), {kind, color} ) =
             Mover ->
                 Draw.mover size x y colorString
 
+grid_size = 200
+
+fromPxToGrid : Float -> Int
+fromPxToGrid x =
+    (floor x)//grid_size
+
 
 view : Model -> Html.Html Msg
 view model =
     let
-        size = 200
+        size = grid_size
         totalSize = String.fromInt (10*size)
         anchor =
             case model.anchor of
@@ -266,8 +300,16 @@ view model =
                     Draw.anchor size x y
                 Nothing ->
                     []
+        movingPiece =
+            case (model.lastMovedPiece, model.dragState) of
+                (Just {piece}, Just {x, y}) ->
+                    drawPiece size ((x//grid_size, y//grid_size), piece)
+                (Just {piece, from}, Nothing) ->
+                    drawPiece size ((from.y, from.x), piece)
+                _ ->
+                    []
     in
-    Html.div []
+    Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
     [ Svg.svg 
         [ Svg.Attributes.width totalSize
         , Svg.Attributes.height totalSize
@@ -277,6 +319,7 @@ view model =
             [ Draw.board size
             , List.concat (List.map (drawPiece size) <| Dict.toList model.board)
             , anchor
+            , movingPiece
             ]
         )
     ]

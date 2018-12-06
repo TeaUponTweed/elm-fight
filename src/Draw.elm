@@ -1,5 +1,4 @@
---module Draw exposing (pusher, mover, abyss, empty, isInBoard)
-module Draw exposing (board, isInBoard)
+module Draw exposing (board, isInBoard, pusher, mover, anchor)
 
 import List
 import Svg exposing (Svg)
@@ -53,157 +52,65 @@ board size =
 
 
 
+pusher : Int -> Int -> Int -> String -> List (Svg msg)
+pusher size x y color =
+    let
+        (posx, posy, fsize) =
+            (toFloat (size * x), toFloat (size * y), toFloat size)
+    in
+        [ Svg.rect
+            [ Attributes.fill "#333333"
+            , Attributes.x <| String.fromInt <| round (posx + fsize * 0.02)
+            , Attributes.y <| String.fromInt <| round (posy + fsize * 0.02)
+            , Attributes.width <| String.fromInt <| round (fsize * 0.96)
+            , Attributes.height <| String.fromInt <| round (fsize * 0.96)
+            ]
+            []
+        , Svg.rect
+            [ Attributes.fill color
+            , Attributes.x <| String.fromInt <| round (posx + fsize * 0.1)
+            , Attributes.y <| String.fromInt <| round (posy + fsize * 0.1)
+            , Attributes.width <| String.fromInt <| round (fsize * 0.8)
+            , Attributes.height <| String.fromInt <| round (fsize * 0.8)
+            ]
+            []
+        ]
 
-pusher : Int -> Int -> Int -> String -> Svg msg
---pusher size color isAnchored =
---    let
---        ( posx, posy, totsize ) =
---            ( 0.0, 0.0, 1.0 )
-
---        anchor =
---            case isAnchored of
---                True ->
---                    circle
---                        [ fill "#ff0000"
---                        , cx (String.fromFloat (posx + (totsize / 2.0)))
---                        , cy (String.fromFloat (posy + (totsize / 2.0)))
---                        , r (String.fromFloat (totsize / 4.0))
---                        ]
---                        []
-
---                _ ->
---                    circle
---                        [ fill color
---                        , cx (String.fromFloat (posx + (totsize / 2.0)))
---                        , cy (String.fromFloat (posy + (totsize / 2.0)))
---                        , r (String.fromFloat (totsize / 4.0))
---                        ]
---                        []
---    in
---    svg
---        [ x (String.fromFloat 0)
---        , y (String.fromFloat 0)
---        , width (String.fromFloat size)
---        , height (String.fromFloat size)
---        , viewBox
---            ("0 0 "
---                ++ String.fromFloat totsize
---                ++ " "
---                ++ String.fromFloat totsize
---            )
---        ]
---        [ rect
---            [ fill "#333333"
---            , x (String.fromFloat (posx + totsize * 0.02))
---            , y (String.fromFloat (posy + totsize * 0.02))
---            , width (String.fromFloat (totsize * 0.96))
---            , height (String.fromFloat (totsize * 0.96))
---            ]
---            []
---        , rect
---            [ fill color
---            , x (String.fromFloat (posx + totsize * 0.1))
---            , y (String.fromFloat (posy + totsize * 0.1))
---            , width (String.fromFloat (totsize * 0.8))
---            , height (String.fromFloat (totsize * 0.8))
---            ]
---            []
---        , anchor
---        ]
+mover : Int -> Int -> Int -> String -> List (Svg msg)
+mover size x y color =
+    let
+        (posx, posy, fsize) =
+            (toFloat (size * x), toFloat (size * y), toFloat size)
+    in
+        [ Svg.circle
+            [ Attributes.fill "#333333"
+            , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
+            , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
+            , Attributes.r <| String.fromInt <| round (fsize / 2.0)
+            ]
+            []
+        , Svg.circle
+            [ Attributes.fill color
+            , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
+            , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
+            , Attributes.r <| String.fromInt <| round ((fsize * 0.9) / 2.0)
+            ]
+            []
+        ]
 
 
---mover : Float -> String -> Html.Html msg
---mover size color =
---    let
---        ( posx, posy, totsize ) =
---            ( 0.0, 0.0, 1.0 )
---    in
---    svg
---        [ x (String.fromFloat 0)
---        , y (String.fromFloat 0)
---        , width (String.fromFloat size)
---        , height (String.fromFloat size)
---        , viewBox
---            ("0 0 "
---                ++ String.fromFloat totsize
---                ++ " "
---                ++ String.fromFloat totsize
---            )
---        ]
---        [ circle
---            [ fill "#333333"
---            , cx (String.fromFloat (posx + (totsize / 2.0)))
---            , cy (String.fromFloat (posy + (totsize / 2.0)))
---            , r (String.fromFloat (totsize / 2.0))
---            ]
---            []
---        , circle
---            [ fill color
---            , cx (String.fromFloat (posx + (totsize / 2.0)))
---            , cy (String.fromFloat (posy + (totsize / 2.0)))
---            , r (String.fromFloat ((totsize * 0.9) / 2.0))
---            ]
---            []
---        ]
-
-
---abyss : Float -> Html.Html msg
---abyss size =
---    let
---        ( posx, posy, totsize ) =
---            ( 0.0, 0.0, 1.0 )
---    in
---    svg
---        [ x (String.fromFloat 0)
---        , y (String.fromFloat 0)
---        , width (String.fromFloat size)
---        , height (String.fromFloat size)
---        , viewBox
---            ("0 0 "
---                ++ String.fromFloat totsize
---                ++ " "
---                ++ String.fromFloat totsize
---            )
---        ]
---        [ rect
---            [ fill "#0000ff"
---            , x (String.fromFloat posx)
---            , y (String.fromFloat posy)
---            , width (String.fromFloat totsize)
---            , height (String.fromFloat totsize)
---            ]
---            []
---        ]
-
-
---boardColor =
---    "#8B4513"
-
-
---empty : Float -> Html.Html msg
---empty size =
---    let
---        ( posx, posy, totsize ) =
---            ( 0.0, 0.0, 1.0 )
---    in
---    svg
---        [ x (String.fromFloat 0)
---        , y (String.fromFloat 0)
---        , width (String.fromFloat size)
---        , height (String.fromFloat size)
---        , viewBox
---            ("0 0 "
---                ++ String.fromFloat totsize
---                ++ " "
---                ++ String.fromFloat totsize
---            )
---        ]
---        [ rect
---            [ fill boardColor
---            , x (String.fromFloat posx)
---            , y (String.fromFloat posy)
---            , width (String.fromFloat totsize)
---            , height (String.fromFloat totsize)
---            ]
---            []
---        ]
+anchor : Int -> Int -> Int -> List (Svg msg)
+anchor size x y =
+    let
+        (posx, posy, fsize) =
+            (toFloat (size * x), toFloat (size * y), toFloat size)
+    in
+        [
+            Svg.circle
+                [ Attributes.fill "#ff0000"
+                , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
+                , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
+                , Attributes.r <| String.fromInt <| round (fsize / 4.0)
+                ]
+                []
+        ]

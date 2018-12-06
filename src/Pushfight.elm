@@ -85,18 +85,17 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     let
         startingPieces =
-            [ ( (3, 2), Piece Mover  White )
-            , ( (4, 0), Piece Pusher White )
-            , ( (4, 1), Piece Mover  White )
-            , ( (4, 2), Piece Pusher White )
-            , ( (4, 3), Piece Pusher White )
-            , ( (5, 0), Piece Pusher Black )
-            , ( (5, 1), Piece Mover  Black )
-            , ( (5, 2), Piece Pusher Black )
-            , ( (5, 3), Piece Pusher Black )
-            , ( (6, 2), Piece Mover  Black )
+            [ ( (2, 3), Piece Mover  White )
+            , ( (0, 4), Piece Pusher White )
+            , ( (1, 4), Piece Mover  White )
+            , ( (2, 4), Piece Pusher White )
+            , ( (3, 4), Piece Pusher White )
+            , ( (0, 5), Piece Pusher Black )
+            , ( (1, 5), Piece Mover  Black )
+            , ( (2, 5), Piece Pusher Black )
+            , ( (3, 5), Piece Pusher Black )
+            , ( (2, 6), Piece Mover  Black )
             ] |> Dict.fromList
-            
     in
         ( Model startingPieces Nothing Nothing Nothing
         , Cmd.none
@@ -239,12 +238,34 @@ subscriptions model =
                 , Browser.Events.onMouseUp (Decode.map DragEnd position)
                 ]
 
+drawPiece : Int -> (PositionKey, Piece) -> List (Svg.Svg Msg)
+drawPiece size ( (y, x), {kind, color} ) =
+    let
+        colorString =
+            case color of
+                White ->
+                    "#ffffff"
+                Black ->
+                    "#000000"
+    in
+        case kind of
+            Pusher ->
+                Draw.pusher size x y colorString
+            Mover ->
+                Draw.mover size x y colorString
+
 
 view : Model -> Html.Html Msg
 view model =
     let
         size = 200
         totalSize = String.fromInt (10*size)
+        anchor =
+            case model.anchor of
+                Just {x, y} ->
+                    Draw.anchor size x y
+                Nothing ->
+                    []
     in
     Html.div []
     [ Svg.svg 
@@ -252,5 +273,10 @@ view model =
         , Svg.Attributes.height totalSize
         , Svg.Attributes.viewBox <| "0 0 " ++ totalSize ++ " " ++ totalSize
         ]
-        (Draw.board size)
+        ( List.concat
+            [ Draw.board size
+            , List.concat (List.map (drawPiece size) <| Dict.toList model.board)
+            , anchor
+            ]
+        )
     ]

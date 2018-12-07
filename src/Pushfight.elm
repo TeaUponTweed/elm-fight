@@ -83,7 +83,10 @@ type DragState
     = NotDragging
     | DraggingNothing MouseDrag
     | DraggingPiece MovingPiece
--- TODO store grid coordinates or pixels explicitly
+-- TODO
+-- * store grid coordinates vs pixels explicitly
+-- * Refactor board/piece movement to not allow invalid states
+
 type alias Model =
     { board : Board
     , dragState : DragState
@@ -170,7 +173,7 @@ handleDrag model mousePos =
                     Nothing ->
                         MouseDrag mousePos mousePos
                 updatedMovingPiece =
-                    { previousMovingPiece | mouseDrag = Just  <| (Debug.log "drag pos: " updatedMouseDrag) }
+                    { previousMovingPiece | mouseDrag = Just updatedMouseDrag }
             in
                 { model | dragState = DraggingPiece updatedMovingPiece }
 
@@ -194,8 +197,8 @@ getGridPos {x, y} mouseDrag =
                 dx = ( (sign dxpx) * (abs dxpx + (grid_size // 2)) ) // grid_size
                 dy = ( (sign dypx) * (abs dypx + (grid_size // 2)) ) // grid_size
             in
-                ( x + (Debug.log "dx " dx)
-                , y + (Debug.log "dy " dy)
+                ( x  + dx
+                , y  + dy
                 )
         Nothing ->
             ( x, y )
@@ -207,7 +210,7 @@ handleDragEnd model =
             let
                 (toX, toY) = getGridPos from mouseDrag
             in
-                case move model.board (from.x, from.y) (toX, toY) of
+                case move model (from.x, from.y) (toX, toY) of
                     Just updatedBoard ->
                         { model | board = updatedBoard, dragState = NotDragging}
                     Nothing ->
@@ -239,10 +242,6 @@ handleClick model (x, y) =
             model
 
 
---isConnected : Position -> Position -> Bool
---isConnected pos1 pos2 =
---    abs(pos1.x - pos2.x) + (pos1.y - pos2.y) /= 1
-
 isPositionInBoard : (Int, Int) -> Bool
 isPositionInBoard (x, y) = 
     Draw.isInBoard x y
@@ -272,25 +271,34 @@ breadthFirstSearchImpl unexplored occupied explored =
                     |> Set.toList
                     |> List.append xs
             in
-                breadthFirstSearchImpl toExplore occupied (x :: explored)
+                breadthFirstSearchImpl (Debug.log "toExplore: " toExplore) occupied (x :: explored)
 
 
 breadthFirstSearch : PositionKey -> Set PositionKey -> Set PositionKey
 breadthFirstSearch start occupied =
     breadthFirstSearchImpl [start] occupied []
 
-isValidMove : Board -> PositionKey -> PositionKey -> Bool
+type MoveResult
+    = ValidMove
+    | NoPieceToMove
+    | Occupied
+    | Unreachable
+
+isValidMove : Board -> PositionKey -> PositionKey -> MoveResult
 isValidMove board from to =
     if Dict.member to board then
-        False
+        Occupied
     else if not (Dict.member from board) then
-        False
+        NoPieceToMove
     else
         let
             occupied = Set.fromList <| Dict.keys board
             validMoves = breadthFirstSearch from occupied
         in
-            Set.member to validMoves
+            if Set.member to validMoves then
+                ValidMove
+            else
+                Unreachable
 
 getPushedPieces : Board -> PositionKey -> PositionKey -> List PositionKey -> List PositionKey
 getPushedPieces board from to pushed =
@@ -300,28 +308,96 @@ getPushedPieces board from to pushed =
         dx = toX - fromX
         dy = toY - fromY
         next = (toX + dx, toY + dy)
-        havePushed = to :: pushed
     in
-        if Dict.member to board then
-            getPushedPieces board to next havePushed
-        else
+        if dx == 0 && dy == 0 then
             pushed
+        else
+            if Dict.member to board then
+                getPushedPieces board to next (to::pushed)
+            else
+                pushed
 
-move : Board -> (Int, Int) -> (Int, Int) -> Maybe Board
-move board from to =
+doMovePiece : Board -> (Int, Int) -> (Int, Int) -> Board
+doMovePiece board from to =
     case Dict.get from board of
         Just piece ->
-            if isValidMove board from to then
-                Dict.remove from board
-                |> Dict.insert to piece
-                |> Just
-
-            else
-                Nothing
+            Dict.remove from board
+            |> Dict.insert to piece
         Nothing ->
+            board
+
+move : Model -> (Int, Int) -> (Int, Int) -> Maybe Board
+move model from to =
+    case isValidMove model.board from to of
+        ValidMove ->
+            Just <| doMovePiece model.board from to
+        Occupied ->
+            push model from to
+        _ ->
             Nothing
 
+doPushPieces : Board -> (Int, Int) -> List PositionKey -> Board
+doPushPieces board (dx, dy) piecesToPush =
+    case piecesToPush of
+        [] ->
+            board
+        (x, y) :: pieces ->
+            doPushPieces (doMovePiece board (x, y) (x + dx, y + dy)) (dx, dy) pieces
 
+type PushResult
+    = ValidPush
+    | InvalidPush
+    | NotAdjacent
+    | AgainstRails
+    | ThroughAnchor
+    | NotPusher
+
+isValidPush : Model -> List PositionKey -> Int -> Int -> PushResult
+isValidPush model pushedPieces dx dy =
+    if (abs dx) + (abs dy) == 1 then
+        case pushedPieces of
+            [] ->
+                NotPusher
+            [ p ] ->
+                NotAdjacent
+            (x, y) :: ps ->
+                if ((Debug.log "dy-" (y + dy)) < 0) || ((y + dy) > 3) then
+                    AgainstRails
+                else
+                    case model.anchor of
+                        Just anchorPos ->
+                            if List.member (anchorPos.x, anchorPos.y) ((x, y) :: ps ) then
+                                ThroughAnchor
+                            else
+                                ValidPush
+                        Nothing ->
+                            ValidPush
+    else
+        NotAdjacent
+
+push : Model -> (Int, Int) -> (Int, Int) -> Maybe Board
+push model from to =
+    let
+        pushedPieces =
+            getPushedPieces model.board from to [from]
+        (toX, toY) = to
+        (fromX, fromY) = from
+        dx = toX - fromX
+        dy = toY - fromY
+    in
+        case Dict.get from model.board of
+            Just {kind} ->
+                case kind of
+                    Pusher ->
+                        case isValidPush model pushedPieces dx dy of
+                            ValidPush ->
+                                Just <| doPushPieces model.board (dx, dy) pushedPieces
+                            _ ->
+                                Nothing
+                    Mover ->
+                        Nothing
+            Nothing ->
+                Nothing
 
 position : Decode.Decoder Position
 position =

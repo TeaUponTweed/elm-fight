@@ -267,7 +267,7 @@ breadthFirstSearchImpl unexplored occupied explored =
         x :: xs ->
             let
                 neighbors = getNeighbors x
-                unexploredNeighbors = Set.diff occupied <| Set.diff neighbors (Set.fromList explored)
+                unexploredNeighbors = Set.diff (Set.diff neighbors (Set.fromList explored)) occupied
                 toExplore = unexploredNeighbors
                     |> Set.toList
                     |> List.append xs
@@ -311,13 +311,13 @@ move : Board -> (Int, Int) -> (Int, Int) -> Maybe Board
 move board from to =
     case Dict.get from board of
         Just piece ->
-            --if isValidMove board from to then
-            Dict.remove from board
-            |> Dict.insert to piece
-            |> Just
+            if isValidMove board from to then
+                Dict.remove from board
+                |> Dict.insert to piece
+                |> Just
 
-            --else
-                --Nothing
+            else
+                Nothing
         Nothing ->
             Nothing
 

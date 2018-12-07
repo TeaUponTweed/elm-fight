@@ -61,6 +61,7 @@ type alias Piece =
 type alias MovingPiece =
     { piece : Piece
     , from : Position
+    , mouseDrag : Maybe MouseDrag
     }
 
 type alias Position =
@@ -73,11 +74,19 @@ type alias PositionKey = (Int, Int)
 type alias Board =
     Dict PositionKey Piece
 
+type alias MouseDrag =
+    { dragStart   : Position
+    , dragCurrent : Position
+    }
 
+type DragState
+    = NotDragging
+    | DraggingNothing MouseDrag
+    | DraggingPiece MovingPiece
+-- TODO store grid coordinates or pixels explicitly
 type alias Model =
     { board : Board
-    , lastMovedPiece : Maybe MovingPiece
-    , dragState : Maybe Position -- has to be separate to handle timing issues
+    , dragState : DragState
     , anchor : Maybe Position
     }
 
@@ -98,7 +107,7 @@ init _ =
             , ( (6, 2), Piece Mover  Black )
             ] |> Dict.fromList
     in
-        ( Model startingPieces Nothing Nothing Nothing
+        ( Model startingPieces NotDragging Nothing
         , Cmd.none
         )
 
@@ -108,8 +117,7 @@ init _ =
 
 
 type Msg
-    = DragStart Position
-    | DragAt Position
+    = DragAt Position
     | DragEnd Position
     | MouseDownAt (Float, Float)
 
@@ -118,20 +126,16 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        DragStart pos ->
-            ( { model | dragState = Just pos}
+        DragAt mousePos ->
+            ( handleDrag model mousePos
             , Cmd.none
             )
 
-        DragAt pos ->
-            ( { model | dragState = Just pos}
+        DragEnd mousePos ->
+            ( handleDragEnd model
             , Cmd.none
             )
 
-        DragEnd pos ->
-            ( handleDragEnd { model | dragState = Just pos }
-            , Cmd.none
-            )
         MouseDownAt (x, y) ->
             ( handleClick model (fromPxToGrid x, fromPxToGrid y)
             , Cmd.none
@@ -145,24 +149,95 @@ popPiece key board =
         Nothing ->
             (board, Nothing)
 
-handleClick : Model -> PositionKey -> Model
-handleClick model (x, y) =
-    let
-        (newBoard, maybePiece) = popPiece (x, y) model.board
-        movingPiece = case
-            maybePiece of
-                Just piece ->
-                     Just <| MovingPiece piece (Position x y)
-                Nothing ->
-                    Nothing
+handleDrag : Model -> Position -> Model
+handleDrag model mousePos =
+    case model.dragState of
+        NotDragging ->
+            { model | dragState = DraggingNothing <| MouseDrag mousePos mousePos }
 
-        updatedModel = { model | board = newBoard, lastMovedPiece = movingPiece}
-    in
-        Debug.log ("handleClick " ++ (Debug.toString updatedModel.lastMovedPiece)) updatedModel
+        DraggingNothing previousMouseDrag ->
+            let
+                updatedMouseDrag =
+                    {previousMouseDrag | dragCurrent = mousePos}
+            in
+                { model | dragState = DraggingNothing updatedMouseDrag }
+
+        DraggingPiece previousMovingPiece ->
+            let
+                updatedMouseDrag = case previousMovingPiece.mouseDrag of
+                    Just {dragStart, dragCurrent} ->
+                        MouseDrag dragStart mousePos
+                    Nothing ->
+                        MouseDrag mousePos mousePos
+                updatedMovingPiece =
+                    { previousMovingPiece | mouseDrag = Just  <| (Debug.log "drag pos: " updatedMouseDrag) }
+            in
+                { model | dragState = DraggingPiece updatedMovingPiece }
+
+
+sign : Int -> Int
+sign n =
+    if n < 0 then
+        -1
+    else
+        1
+
+getGridPos : Position -> Maybe MouseDrag -> PositionKey
+getGridPos {x, y} mouseDrag =
+    case mouseDrag of
+        Just {dragStart, dragCurrent} ->
+            let
+                dxpx =
+                    (dragCurrent.x - dragStart.x)
+                dypx =
+                    (dragCurrent.y - dragStart.y)
+                dx = ( (sign dxpx) * (abs dxpx + (grid_size // 2)) ) // grid_size
+                dy = ( (sign dypx) * (abs dypx + (grid_size // 2)) ) // grid_size
+            in
+                ( x + (Debug.log "dx " dx)
+                , y + (Debug.log "dy " dy)
+                )
+        Nothing ->
+            ( x, y )
 
 handleDragEnd : Model -> Model
 handleDragEnd model =
-    model
+    case model.dragState of
+        DraggingPiece {piece, from, mouseDrag} ->
+            let
+                (toX, toY) = getGridPos from mouseDrag
+            in
+                case move model.board (from.x, from.y) (toX, toY) of
+                    Just updatedBoard ->
+                        { model | board = updatedBoard, dragState = NotDragging}
+                    Nothing ->
+                        { model | dragState = NotDragging }
+        _ ->
+            { model | dragState = NotDragging }
+
+handleClick : Model -> PositionKey -> Model
+handleClick model (x, y) =
+    case Dict.get (x, y) model.board of
+        Just piece ->
+            case model.dragState of
+                NotDragging ->
+                    let
+                        lastMovedPiece =
+                            MovingPiece piece (Position x y) Nothing
+                    in
+                        { model | dragState = DraggingPiece lastMovedPiece }
+                DraggingNothing previousMouseDrag ->
+                    let
+                        lastMovedPiece =
+                            MovingPiece piece (Position x y) (Just previousMouseDrag)
+                    in
+                        { model | dragState = DraggingPiece lastMovedPiece }
+                _ ->
+                    model
+
+        Nothing ->
+            model
+
 
 --isConnected : Position -> Position -> Bool
 --isConnected pos1 pos2 =
@@ -236,13 +311,13 @@ move : Board -> (Int, Int) -> (Int, Int) -> Maybe Board
 move board from to =
     case Dict.get from board of
         Just piece ->
-            if isValidMove board from to then
-                Dict.insert to piece board
-                |> Dict.remove from
-                |> Just
+            --if isValidMove board from to then
+            Dict.insert to piece board
+            |> Dict.remove from
+            |> Just
 
-            else
-                Nothing
+            --else
+                --Nothing
         Nothing ->
             Nothing
 
@@ -257,24 +332,26 @@ position =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.dragState of
-        Nothing ->
-            Browser.Events.onMouseDown (Decode.map DragStart position)
-
+        NotDragging ->
+            Browser.Events.onMouseDown (Decode.map DragAt position)
         _ ->
             Sub.batch
                 [ Browser.Events.onMouseMove (Decode.map DragAt position)
                 , Browser.Events.onMouseUp (Decode.map DragEnd position)
                 ]
 
-drawPiece : Int -> (PositionKey, Piece) -> List (Svg.Svg Msg)
-drawPiece size ( (x, y), {kind, color} ) =
+drawPiece : Int -> Bool -> (PositionKey, Piece) -> List (Svg.Svg Msg)
+drawPiece size isMoving ( (x, y), {kind, color} ) =
     let
         colorString =
-            case color of
-                White ->
-                    "#ffffff"
-                Black ->
-                    "#000000"
+            if isMoving then
+                "#888888"
+            else
+                case color of
+                    White ->
+                        "#ffffff"
+                    Black ->
+                        "#000000"
     in
         case kind of
             Pusher ->
@@ -301,11 +378,12 @@ view model =
                 Nothing ->
                     []
         movingPiece =
-            case (model.lastMovedPiece, model.dragState) of
-                (Just {piece}, Just {x, y}) ->
-                    drawPiece size ((x//grid_size, y//grid_size), piece)
-                (Just {piece, from}, Nothing) ->
-                    drawPiece size ((from.y, from.x), piece)
+            case model.dragState of
+                DraggingPiece {piece, from, mouseDrag} ->
+                    List.concat
+                        [ drawPiece size True ((from.x, from.y), piece)
+                        , drawPiece size False ((getGridPos from mouseDrag), piece)
+                        ]
                 _ ->
                     []
     in
@@ -317,7 +395,7 @@ view model =
         ]
         ( List.concat
             [ Draw.board size
-            , List.concat (List.map (drawPiece size) <| Dict.toList model.board)
+            , List.concat (List.map (drawPiece size False) <| Dict.toList model.board)
             , anchor
             , movingPiece
             ]

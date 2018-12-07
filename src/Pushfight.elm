@@ -312,8 +312,8 @@ move board from to =
     case Dict.get from board of
         Just piece ->
             --if isValidMove board from to then
-            Dict.insert to piece board
-            |> Dict.remove from
+            Dict.remove from board
+            |> Dict.insert to piece
             |> Just
 
             --else

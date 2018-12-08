@@ -5,6 +5,7 @@ import Set exposing (Set)
 
 import Browser
 import Browser.Events
+import Browser.Dom
 
 import Html
 import Html.Events
@@ -12,6 +13,8 @@ import Html.Events.Extra.Mouse as Mouse
 
 import Svg
 import Svg.Attributes
+
+import Task
 
 import Json.Decode as Decode
 
@@ -109,6 +112,8 @@ type alias Model =
     { currentTurn : Turn
     , gameStage : GameStage
     , dragState : DragState
+    , windowWidth : Int
+    , gridSize : Int
     }
 
 getMoveBoard : Model -> Board
@@ -169,9 +174,14 @@ init _ =
         firstMoves = NoMoves startingPieces
         turn = Turn firstMoves BeforeFirstPush
     in
-        ( Model turn WhiteSetup NotDragging
-        , Cmd.none
+        ( Model turn WhiteSetup NotDragging 1000 100
+        , Task.perform (WindowWidth << getViewportWidth) Browser.Dom.getViewport
         )
+
+
+getViewportWidth : Browser.Dom.Viewport -> Int
+getViewportWidth {scene} =
+    floor scene.width
 
 -- UPDATE
 
@@ -179,6 +189,7 @@ type Msg
     = DragAt Position
     | DragEnd Position
     | MouseDownAt (Float, Float)
+    | WindowWidth Int
     | EndTurn
     | Undo
 
@@ -196,7 +207,11 @@ update msg model =
             )
 
         MouseDownAt (x, y) ->
-            ( handleClick model (fromPxToGrid x, fromPxToGrid y)
+            ( handleClick model (fromPxToGrid x model.gridSize, fromPxToGrid y model.gridSize)
+            , Cmd.none
+            )
+        WindowWidth width ->
+            ( { model | windowWidth = width, gridSize = width // 10 }
             , Cmd.none
             )
         EndTurn ->
@@ -336,7 +351,7 @@ handleDragEnd model =
     case model.dragState of
         DraggingPiece {piece, from, mouseDrag} ->
             let
-                (toX, toY) = getGridPos from mouseDrag
+                (toX, toY) = getGridPos from mouseDrag model.gridSize
                 updatedTurn = move model (from.x, from.y) (toX, toY)
             in
                 { model | currentTurn = updatedTurn, dragState = NotDragging}
@@ -593,8 +608,19 @@ position =
         (Decode.field "pageX" Decode.int)
         (Decode.field "pageY" Decode.int)
 
+getWidthFromResize : Int -> Int -> Msg
+getWidthFromResize width height =
+    WindowWidth (Debug.log "width" width)
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    Sub.batch
+    [ mouseSubsrciptions model
+    , Browser.Events.onResize getWidthFromResize-- (Decode.map WindowWidth windowWidth)
+    ]
+
+mouseSubsrciptions : Model -> Sub Msg
+mouseSubsrciptions model =
     case model.dragState of
         NotDragging ->
             Browser.Events.onMouseDown (Decode.map DragAt position)
@@ -625,17 +651,16 @@ drawPiece size isMoving ( (x, y), {kind, color} ) =
             Mover ->
                 Draw.mover size x y colorString
 
-grid_size = 100
 
-fromPxToGrid : Float -> Int
-fromPxToGrid x =
-    (floor x)//grid_size
+fromPxToGrid : Float -> Int -> Int
+fromPxToGrid x gridSize =
+    (floor x)//gridSize
 
 
 view : Model -> Html.Html Msg
 view model =
     let
-        size = grid_size
+        size = model.gridSize
         totalSize = String.fromInt (10*size)
         board = getBoard model
         anchor = getAnchor model
@@ -650,7 +675,7 @@ view model =
                 DraggingPiece {piece, from, mouseDrag} ->
                     List.concat
                         [ drawPiece size True ((from.x, from.y), piece)
-                        , drawPiece size False ((getGridPos from mouseDrag), piece)
+                        , drawPiece size False ((getGridPos from mouseDrag model.gridSize), piece)
                         ]
                 _ ->
                     []
@@ -700,8 +725,8 @@ sign n =
     else
         1
 
-getGridPos : Position -> Maybe MouseDrag -> PositionKey
-getGridPos {x, y} mouseDrag =
+getGridPos : Position -> Maybe MouseDrag -> Int -> PositionKey
+getGridPos {x, y} mouseDrag gridSize =
     case mouseDrag of
         Just {dragStart, dragCurrent} ->
             let
@@ -709,8 +734,8 @@ getGridPos {x, y} mouseDrag =
                     (dragCurrent.x - dragStart.x)
                 dypx =
                     (dragCurrent.y - dragStart.y)
-                dx = ( (sign dxpx) * (abs dxpx + (grid_size // 2)) ) // grid_size
-                dy = ( (sign dypx) * (abs dypx + (grid_size // 2)) ) // grid_size
+                dx = ( (sign dxpx) * (abs dxpx + (gridSize // 2)) ) // gridSize
+                dy = ( (sign dypx) * (abs dypx + (gridSize // 2)) ) // gridSize
             in
                 ( x  + dx
                 , y  + dy

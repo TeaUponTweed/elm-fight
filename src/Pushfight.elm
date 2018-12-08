@@ -79,6 +79,42 @@ type alias MouseDrag =
     , dragCurrent : Position
     }
 
+type alias Move =
+    { board : Board
+    , lastMovedPiece : PositionKey
+    }
+
+--type alias NoMoves =
+--        { initialBoard: Board
+--        }
+--type alias OneMove =
+--        { initialBoard: Board
+--        , firstBoard : Board
+--        , firstMoved : PositionKey
+--        }
+--type alias TwoMoves =
+--        { initialBoard: Board
+--        , firstBoard : Board
+--        , firstMoved : PositionKey
+--        , secondBoard : Board
+--        , secondMoved : PositionKey
+--        }
+type Moves
+    = NoMoves Board
+    | OneMove (Board, Move)
+    | TwoMoves (Board, Move, Move)
+
+type Push
+    = NotYetPushed Position
+    | HavePushed (Board, Position)
+    | BeforeFirstPush
+
+
+type alias Turn =
+    { moves : Moves
+    , push  : Push
+    }
+
 type DragState
     = NotDragging
     | DraggingNothing MouseDrag
@@ -88,9 +124,8 @@ type DragState
 -- * Refactor board/piece movement to not allow invalid states
 
 type alias Model =
-    { board : Board
+    { currentTurn : Turn
     , dragState : DragState
-    , anchor : Maybe Position
     }
 
 
@@ -109,12 +144,12 @@ init _ =
             , ( (5, 3), Piece Pusher Black )
             , ( (6, 2), Piece Mover  Black )
             ] |> Dict.fromList
+        firstMoves = NoMoves startingPieces
+        turn = Turn firstMoves BeforeFirstPush
     in
-        ( Model startingPieces NotDragging Nothing
+        ( Model turn NotDragging
         , Cmd.none
         )
-
-
 
 -- UPDATE
 
@@ -143,14 +178,6 @@ update msg model =
             ( handleClick model (fromPxToGrid x, fromPxToGrid y)
             , Cmd.none
             )
-
-popPiece : PositionKey -> Board -> (Board, Maybe Piece)
-popPiece key board = 
-    case Dict.get key board of
-        Just piece ->
-            (Dict.remove key board, Just piece)
-        Nothing ->
-            (board, Nothing)
 
 handleDrag : Model -> Position -> Model
 handleDrag model mousePos =
@@ -209,18 +236,15 @@ handleDragEnd model =
         DraggingPiece {piece, from, mouseDrag} ->
             let
                 (toX, toY) = getGridPos from mouseDrag
+                updatedTurn = move model (from.x, from.y) (toX, toY)
             in
-                case move model (from.x, from.y) (toX, toY) of
-                    Just updatedBoard ->
-                        { model | board = updatedBoard, dragState = NotDragging}
-                    Nothing ->
-                        { model | dragState = NotDragging }
+                { model | currentTurn = updatedTurn, dragState = NotDragging}
         _ ->
             { model | dragState = NotDragging }
 
 handleClick : Model -> PositionKey -> Model
 handleClick model (x, y) =
-    case Dict.get (x, y) model.board of
+    case Dict.get (x, y) (getBoard model) of
         Just piece ->
             case model.dragState of
                 NotDragging ->
@@ -284,6 +308,7 @@ type MoveResult
     | Occupied
     | Unreachable
 
+
 isValidMove : Board -> PositionKey -> PositionKey -> MoveResult
 isValidMove board from to =
     if Dict.member to board then
@@ -326,15 +351,49 @@ doMovePiece board from to =
         Nothing ->
             board
 
-move : Model -> (Int, Int) -> (Int, Int) -> Maybe Board
+move : Model -> (Int, Int) -> (Int, Int) -> Turn
 move model from to =
-    case isValidMove model.board from to of
+    case isValidMove (getBoard model) from to of
         ValidMove ->
-            Just <| doMovePiece model.board from to
+            let
+                updatedBoard = doMovePiece (getBoard model) from to
+                turn = model.currentTurn
+            in
+                case model.currentTurn.push of
+                    HavePushed _->
+                        Debug.log "Can't move after pushing" model.currentTurn -- TODO display banner "Can't move after pushing"
+                    _ ->
+                        case turn.moves of
+                            NoMoves initialBoard ->
+                                {turn | moves = OneMove (initialBoard, Move updatedBoard to) }
+                            OneMove (initialBoard, {board, lastMovedPiece}) ->
+                                if from == lastMovedPiece then
+                                    {turn | moves = OneMove (initialBoard, Move updatedBoard to) }
+                                else
+                                    {turn | moves = TwoMoves (initialBoard, Move board lastMovedPiece, Move updatedBoard to) }
+                            TwoMoves (initialBoard, firstMove, {board, lastMovedPiece}) ->
+                                if from == lastMovedPiece then
+                                    {turn | moves = TwoMoves (initialBoard, firstMove, Move updatedBoard to) }
+                                else
+                                    Debug.log "Too may moves" model.currentTurn -- TODO display banner "Too many moves"
         Occupied ->
-            push model from to
+            let
+                currentTurn = model.currentTurn
+            in
+                case model.currentTurn.push of
+                    HavePushed _ ->
+                        Debug.log "Can't push twice" model.currentTurn -- TODO display banner "Can't push twice"
+                    _ ->
+                        case push model from to of
+                            Just (pushedBoard, newAnchorPos) ->
+                                {currentTurn | push = HavePushed (pushedBoard, newAnchorPos)}
+                            Nothing ->
+                                Debug.log "Invalid Push" model.currentTurn -- TODO display banner "Invalid push"
+
+
         _ ->
-            Nothing
+            Debug.log "Invalid move" model.currentTurn -- TODO display banner "Invalid move"
+
 
 doPushPieces : Board -> (Int, Int) -> List PositionKey -> Board
 doPushPieces board (dx, dy) piecesToPush =
@@ -364,7 +423,7 @@ isValidPush model pushedPieces dx dy =
                 if ((Debug.log "dy-" (y + dy)) < 0) || ((y + dy) > 3) then
                     AgainstRails
                 else
-                    case model.anchor of
+                    case getAnchor model of
                         Just anchorPos ->
                             if List.member (anchorPos.x, anchorPos.y) ((x, y) :: ps ) then
                                 ThroughAnchor
@@ -375,23 +434,26 @@ isValidPush model pushedPieces dx dy =
     else
         NotAdjacent
 
-push : Model -> (Int, Int) -> (Int, Int) -> Maybe Board
+push : Model -> (Int, Int) -> (Int, Int) -> Maybe (Board, Position)
 push model from to =
     let
         pushedPieces =
-            getPushedPieces model.board from to [from]
+            getPushedPieces (getBoard model) from to [from]
         (toX, toY) = to
         (fromX, fromY) = from
         dx = toX - fromX
         dy = toY - fromY
     in
-        case Dict.get from model.board of
+        case Dict.get from (getBoard model) of
             Just {kind} ->
                 case kind of
                     Pusher ->
                         case isValidPush model pushedPieces dx dy of
                             ValidPush ->
-                                Just <| doPushPieces model.board (dx, dy) pushedPieces
+                                Just 
+                                ( doPushPieces (getBoard model) (dx, dy) pushedPieces
+                                , Position (fromX + dx) (fromY + dy)
+                                )
                             _ ->
                                 Nothing
                     Mover ->
@@ -442,13 +504,40 @@ fromPxToGrid x =
     (floor x)//grid_size
 
 
+getBoard : Model -> Board
+getBoard model =
+    case model.currentTurn.push of
+        HavePushed (board, anchorPos) ->
+            board
+        _ ->
+            case model.currentTurn.moves of
+                NoMoves board->
+                    board
+                OneMove (_, {board}) ->
+                    board
+                TwoMoves (_, _, {board}) ->
+                    board
+
+getAnchor : Model -> Maybe Position
+getAnchor model =
+    case model.currentTurn.push of
+        HavePushed (_, anchorPos) ->
+            Just anchorPos
+        NotYetPushed anchorPos ->
+            Just anchorPos
+        BeforeFirstPush ->
+            Nothing
+
+
 view : Model -> Html.Html Msg
 view model =
     let
         size = grid_size
         totalSize = String.fromInt (10*size)
-        anchor =
-            case model.anchor of
+        board = getBoard model
+        anchor = getAnchor model
+        anchorSVGs =
+            case anchor of
                 Just {x, y} ->
                     Draw.anchor size x y
                 Nothing ->
@@ -471,8 +560,8 @@ view model =
         ]
         ( List.concat
             [ Draw.board size
-            , List.concat (List.map (drawPiece size False) <| Dict.toList model.board)
-            , anchor
+            , List.concat (List.map (drawPiece size False) <| Dict.toList board)
+            , anchorSVGs
             , movingPiece
             ]
         )

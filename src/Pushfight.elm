@@ -439,12 +439,12 @@ isValidMove model from to =
                         (White, WhiteTurn) ->
                             isReachable board from to
                         (White, WhiteSetup) ->
-                            if toX <= 4 then
+                            if toX <= 4 && toX >= 0  && toY >= 0 && toY <= 3 then
                                 ValidSetupMove
                             else
                                 InvalidMove
                         (Black, BlackSetup) ->
-                            if toX >= 5 then
+                            if toX >= 5 && toX <= 10 && toY >= 0 && toY <= 3 then
                                 ValidSetupMove
                             else
                                 InvalidMove

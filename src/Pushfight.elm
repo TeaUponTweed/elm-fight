@@ -18,7 +18,6 @@ import Json.Decode as Decode
 import Draw
 
 
-
 main =
     Browser.element
         { init = init
@@ -26,8 +25,6 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-
 
 -- MODEL
 
@@ -89,6 +86,13 @@ type Push
     | HavePushed (Board, Position)
     | BeforeFirstPush
 
+type GameStage
+    = WhiteSetup
+    | BlackSetup
+    | WhiteTurn
+    | BlackTurn
+    | WhiteWon
+    | BlackWon
 
 type alias Turn =
     { moves : Moves
@@ -102,6 +106,7 @@ type DragState
 
 type alias Model =
     { currentTurn : Turn
+    , gameStage : GameStage
     , dragState : DragState
     }
 
@@ -153,7 +158,7 @@ init _ =
         firstMoves = NoMoves startingPieces
         turn = Turn firstMoves BeforeFirstPush
     in
-        ( Model turn NotDragging
+        ( Model turn WhiteSetup NotDragging
         , Cmd.none
         )
 
@@ -163,6 +168,8 @@ type Msg
     = DragAt Position
     | DragEnd Position
     | MouseDownAt (Float, Float)
+    | EndTurn
+    | Undo
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -181,6 +188,77 @@ update msg model =
             ( handleClick model (fromPxToGrid x, fromPxToGrid y)
             , Cmd.none
             )
+        EndTurn ->
+            case model.gameStage of
+                WhiteSetup ->
+                    ( { model | gameStage = BlackSetup }
+                    , Cmd.none
+                    )
+                BlackSetup ->
+                    ( { model | gameStage = WhiteTurn }
+                    , Cmd.none
+                    )
+                WhiteTurn ->
+                    if gameOver model then
+                        ( { model | gameStage = WhiteWon }
+                        , Cmd.none
+                        )
+                    else
+                        ( { model | gameStage = BlackTurn }
+                        , Cmd.none
+                        )
+                BlackTurn ->
+                    if gameOver model then
+                        ( { model | gameStage = BlackWon }
+                        , Cmd.none
+                        )
+                    else
+                        ( { model | gameStage = WhiteTurn }
+                        , Cmd.none
+                        )
+                WhiteWon ->
+                    ( model
+                    , Cmd.none
+                    )
+                BlackWon ->
+                    ( model
+                    , Cmd.none
+                    )
+        Undo ->
+            case model.currentTurn.moves of
+                NoMoves _ ->
+                    ( model
+                    , Cmd.none
+                    )
+                OneMove (board, _) ->
+                    let
+                        turn =
+                            model.currentTurn
+                        updatedTurn =
+                            { turn | moves = NoMoves board }
+                    in
+                        ( { model | currentTurn = updatedTurn }
+                        , Cmd.none
+                        )
+                TwoMoves (board, firstMove, _) ->
+                    let
+                        turn =
+                            model.currentTurn
+                        updatedTurn =
+                            { turn | moves = OneMove (board, firstMove) }
+                    in
+                        ( { model | currentTurn = updatedTurn }
+                        , Cmd.none
+                        )
+
+gameOver : Model -> Bool
+gameOver model =
+    let
+        board = getBoard model
+    in
+        Dict.keys board
+        |> List.all isPositionInBoard
+
 
 handleDrag : Model -> Position -> Model
 handleDrag model mousePos =
@@ -246,25 +324,68 @@ handleClick model (x, y) =
 
 type MoveResult
     = ValidMove
+    | ValidSetupMove
+    | InvalidMove
     | NoPieceToMove
     | Occupied
     | Unreachable
+    | WrongColor
+    | GameOver
 
-isValidMove : Board -> PositionKey -> PositionKey -> MoveResult
-isValidMove board from to =
-    if Dict.member to board then
-        Occupied
-    else if not (Dict.member from board) then
-        NoPieceToMove
-    else
-        let
-            occupied = Set.fromList <| Dict.keys board
-            validMoves = breadthFirstSearch from occupied
-        in
-            if Set.member to validMoves then
-                ValidMove
-            else
-                Unreachable
+isReachable : Board -> PositionKey -> PositionKey -> MoveResult
+isReachable board from to =
+    let
+        occupied = Set.fromList <| Dict.keys board
+        validMoves = breadthFirstSearch from occupied
+    in
+        if Set.member to validMoves then
+            ValidMove
+        else
+            Unreachable
+
+isValidMove : Model -> PositionKey -> PositionKey -> MoveResult
+isValidMove model from to =
+    let
+        board = getBoard model
+        pieceToMove = Dict.get from board
+        (toX, toY) = to
+    in
+        if Dict.member to board then
+            Occupied
+        else
+            case pieceToMove of
+                Just {kind, color} ->
+                    case (color, model.gameStage) of
+                        (Black, WhiteTurn) ->
+                            WrongColor
+                        (Black, WhiteSetup) ->
+                            WrongColor
+                        (White, BlackTurn) ->
+                            WrongColor
+                        (White, BlackSetup) ->
+                            WrongColor
+                        (_, WhiteWon) ->
+                            GameOver
+                        (_, BlackWon) ->
+                            GameOver
+                        (Black, BlackTurn) ->
+                            isReachable board from to
+                        (White, WhiteTurn) ->
+                            isReachable board from to
+                        (White, WhiteSetup) ->
+                            if toX <= 4 then
+                                ValidSetupMove
+                            else
+                                InvalidMove
+                        (Black, BlackSetup) ->
+                            if toX >= 5 then
+                                ValidSetupMove
+                            else
+                                InvalidMove
+                Nothing ->
+                    NoPieceToMove
+
+
 
 doMovePiece : Board -> (Int, Int) -> (Int, Int) -> Board
 doMovePiece board from to =
@@ -277,7 +398,7 @@ doMovePiece board from to =
 
 move : Model -> (Int, Int) -> (Int, Int) -> Turn
 move model from to =
-    case isValidMove (getBoard model) from to of
+    case isValidMove model from to of
         ValidMove ->
             let
                 updatedBoard = doMovePiece (getBoard model) from to
@@ -300,6 +421,12 @@ move model from to =
                                     {turn | moves = TwoMoves (initialBoard, firstMove, Move updatedBoard to) }
                                 else
                                     Debug.log "Too may moves" model.currentTurn -- TODO display banner "Too many moves"
+        ValidSetupMove ->
+            let
+                updatedBoard = doMovePiece (getBoard model) from to
+                turn = model.currentTurn
+            in
+                { turn | moves = NoMoves updatedBoard}
         Occupied ->
             let
                 currentTurn = model.currentTurn
@@ -441,7 +568,7 @@ drawPiece size isMoving ( (x, y), {kind, color} ) =
             Mover ->
                 Draw.mover size x y colorString
 
-grid_size = 200
+grid_size = 100
 
 fromPxToGrid : Float -> Int
 fromPxToGrid x =
@@ -471,19 +598,26 @@ view model =
                 _ ->
                     []
     in
-    Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
-    [ Svg.svg 
-        [ Svg.Attributes.width totalSize
-        , Svg.Attributes.height totalSize
-        , Svg.Attributes.viewBox <| "0 0 " ++ totalSize ++ " " ++ totalSize
-        ]
-        ( List.concat
-            [ Draw.board size
-            , List.concat (List.map (drawPiece size False) <| Dict.toList board)
-            , anchorSVGs
-            , movingPiece
+    Html.div []
+    [
+        Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
+        [ Svg.svg 
+            [ Svg.Attributes.width totalSize
+            , Svg.Attributes.height totalSize
+            , Svg.Attributes.viewBox <| "0 0 " ++ totalSize ++ " " ++ totalSize
             ]
-        )
+            ( List.concat
+                [ Draw.board size
+                , List.concat (List.map (drawPiece size False) <| Dict.toList board)
+                , anchorSVGs
+                , movingPiece
+                ]
+            )
+        ]
+    , Html.div []
+        [ Html.button [ Html.Events.onClick EndTurn ] [ Html.text "End Turn" ]
+        , Html.button [ Html.Events.onClick Undo ] [ Html.text "Undo" ]
+        ]
     ]
 
 -- util
@@ -518,13 +652,13 @@ isPositionInBoard (x, y) =
     Draw.isInBoard x y
 
 getNeighbors : PositionKey -> Set PositionKey
-getNeighbors (x, y) = 
+getNeighbors (x, y) =
     List.filter
         isPositionInBoard
-        [ ((x + 1),  y     )
-        , ((x - 1),  y     )
-        , ( x     , (y + 1))
-        , ( x     , (y - 1))
+        [ (x + 1, y    )
+        , (x - 1, y    )
+        , (x    , y + 1)
+        , (x    , y - 1)
         ]
     |> Set.fromList
 

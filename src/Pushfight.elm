@@ -1,25 +1,21 @@
---import Browser
 import Debug
+
 import Dict exposing (Dict)
 import Set exposing (Set)
---import Html
---import Html.Attributes
---import Html.Events exposing (on)
---import Html.Events.Extra.Mouse as Mouse
---import Json.Decode as Decode
-
 
 import Browser
 import Browser.Events
+
 import Html
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
+
 import Svg
 import Svg.Attributes
+
 import Json.Decode as Decode
 
 import Draw
-
 
 
 
@@ -39,7 +35,6 @@ main =
 type PieceKind
     = Pusher
     | Mover
-
 
 
 type PieceColor
@@ -84,21 +79,6 @@ type alias Move =
     , lastMovedPiece : PositionKey
     }
 
---type alias NoMoves =
---        { initialBoard: Board
---        }
---type alias OneMove =
---        { initialBoard: Board
---        , firstBoard : Board
---        , firstMoved : PositionKey
---        }
---type alias TwoMoves =
---        { initialBoard: Board
---        , firstBoard : Board
---        , firstMoved : PositionKey
---        , secondBoard : Board
---        , secondMoved : PositionKey
---        }
 type Moves
     = NoMoves Board
     | OneMove (Board, Move)
@@ -119,15 +99,41 @@ type DragState
     = NotDragging
     | DraggingNothing MouseDrag
     | DraggingPiece MovingPiece
--- TODO
--- * store grid coordinates vs pixels explicitly
--- * Refactor board/piece movement to not allow invalid states
 
 type alias Model =
     { currentTurn : Turn
     , dragState : DragState
     }
 
+getBoard : Model -> Board
+getBoard model =
+    case model.currentTurn.push of
+        HavePushed (board, anchorPos) ->
+            board
+        _ ->
+            case model.currentTurn.moves of
+                NoMoves board->
+                    board
+                OneMove (_, {board}) ->
+                    board
+                TwoMoves (_, _, {board}) ->
+                    board
+
+getAnchor : Model -> Maybe Position
+getAnchor model =
+    case model.currentTurn.push of
+        HavePushed (_, anchorPos) ->
+            Just anchorPos
+        NotYetPushed anchorPos ->
+            Just anchorPos
+        BeforeFirstPush ->
+            Nothing
+
+-- TODO
+-- * store grid coordinates vs pixels explicitly
+-- * Refactor board/piece movement to not allow invalid states
+
+-- init
 
 init : () -> ( Model, Cmd Msg )
 init _ =
@@ -153,13 +159,10 @@ init _ =
 
 -- UPDATE
 
-
 type Msg
     = DragAt Position
     | DragEnd Position
     | MouseDownAt (Float, Float)
-
-
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -205,31 +208,6 @@ handleDrag model mousePos =
                 { model | dragState = DraggingPiece updatedMovingPiece }
 
 
-sign : Int -> Int
-sign n =
-    if n < 0 then
-        -1
-    else
-        1
-
-getGridPos : Position -> Maybe MouseDrag -> PositionKey
-getGridPos {x, y} mouseDrag =
-    case mouseDrag of
-        Just {dragStart, dragCurrent} ->
-            let
-                dxpx =
-                    (dragCurrent.x - dragStart.x)
-                dypx =
-                    (dragCurrent.y - dragStart.y)
-                dx = ( (sign dxpx) * (abs dxpx + (grid_size // 2)) ) // grid_size
-                dy = ( (sign dypx) * (abs dypx + (grid_size // 2)) ) // grid_size
-            in
-                ( x  + dx
-                , y  + dy
-                )
-        Nothing ->
-            ( x, y )
-
 handleDragEnd : Model -> Model
 handleDragEnd model =
     case model.dragState of
@@ -266,48 +244,11 @@ handleClick model (x, y) =
             model
 
 
-isPositionInBoard : (Int, Int) -> Bool
-isPositionInBoard (x, y) = 
-    Draw.isInBoard x y
-
-getNeighbors : PositionKey -> Set PositionKey
-getNeighbors (x, y) = 
-    List.filter
-        isPositionInBoard
-        [ ((x + 1),  y     )
-        , ((x - 1),  y     )
-        , ( x     , (y + 1))
-        , ( x     , (y - 1))
-        ]
-    |> Set.fromList
-
-
-breadthFirstSearchImpl : List PositionKey -> Set PositionKey -> List PositionKey -> Set PositionKey
-breadthFirstSearchImpl unexplored occupied explored =
-    case unexplored of
-        [] ->
-            Set.fromList explored
-        x :: xs ->
-            let
-                neighbors = getNeighbors x
-                unexploredNeighbors = Set.diff (Set.diff neighbors (Set.fromList explored)) occupied
-                toExplore = unexploredNeighbors
-                    |> Set.toList
-                    |> List.append xs
-            in
-                breadthFirstSearchImpl (Debug.log "toExplore: " toExplore) occupied (x :: explored)
-
-
-breadthFirstSearch : PositionKey -> Set PositionKey -> Set PositionKey
-breadthFirstSearch start occupied =
-    breadthFirstSearchImpl [start] occupied []
-
 type MoveResult
     = ValidMove
     | NoPieceToMove
     | Occupied
     | Unreachable
-
 
 isValidMove : Board -> PositionKey -> PositionKey -> MoveResult
 isValidMove board from to =
@@ -324,23 +265,6 @@ isValidMove board from to =
                 ValidMove
             else
                 Unreachable
-
-getPushedPieces : Board -> PositionKey -> PositionKey -> List PositionKey -> List PositionKey
-getPushedPieces board from to pushed =
-    let
-        (toX, toY) = to
-        (fromX, fromY) = from
-        dx = toX - fromX
-        dy = toY - fromY
-        next = (toX + dx, toY + dy)
-    in
-        if dx == 0 && dy == 0 then
-            pushed
-        else
-            if Dict.member to board then
-                getPushedPieces board to next (to::pushed)
-            else
-                pushed
 
 doMovePiece : Board -> (Int, Int) -> (Int, Int) -> Board
 doMovePiece board from to =
@@ -394,6 +318,22 @@ move model from to =
         _ ->
             Debug.log "Invalid move" model.currentTurn -- TODO display banner "Invalid move"
 
+getPushedPieces : Board -> PositionKey -> PositionKey -> List PositionKey -> List PositionKey
+getPushedPieces board from to pushed =
+    let
+        (toX, toY) = to
+        (fromX, fromY) = from
+        dx = toX - fromX
+        dy = toY - fromY
+        next = (toX + dx, toY + dy)
+    in
+        if dx == 0 && dy == 0 then
+            pushed
+        else
+            if Dict.member to board then
+                getPushedPieces board to next (to::pushed)
+            else
+                pushed
 
 doPushPieces : Board -> (Int, Int) -> List PositionKey -> Board
 doPushPieces board (dx, dy) piecesToPush =
@@ -420,7 +360,7 @@ isValidPush model pushedPieces dx dy =
             [ p ] ->
                 NotAdjacent
             (x, y) :: ps ->
-                if ((Debug.log "dy-" (y + dy)) < 0) || ((y + dy) > 3) then
+                if ((y + dy) < 0) || ((y + dy) > 3) then
                     AgainstRails
                 else
                     case getAnchor model of
@@ -461,6 +401,8 @@ push model from to =
             Nothing ->
                 Nothing
 
+-- subscriptions
+
 position : Decode.Decoder Position
 position =
     Decode.map2 Position
@@ -477,6 +419,8 @@ subscriptions model =
                 [ Browser.Events.onMouseMove (Decode.map DragAt position)
                 , Browser.Events.onMouseUp (Decode.map DragEnd position)
                 ]
+
+-- view
 
 drawPiece : Int -> Bool -> (PositionKey, Piece) -> List (Svg.Svg Msg)
 drawPiece size isMoving ( (x, y), {kind, color} ) =
@@ -502,31 +446,6 @@ grid_size = 200
 fromPxToGrid : Float -> Int
 fromPxToGrid x =
     (floor x)//grid_size
-
-
-getBoard : Model -> Board
-getBoard model =
-    case model.currentTurn.push of
-        HavePushed (board, anchorPos) ->
-            board
-        _ ->
-            case model.currentTurn.moves of
-                NoMoves board->
-                    board
-                OneMove (_, {board}) ->
-                    board
-                TwoMoves (_, _, {board}) ->
-                    board
-
-getAnchor : Model -> Maybe Position
-getAnchor model =
-    case model.currentTurn.push of
-        HavePushed (_, anchorPos) ->
-            Just anchorPos
-        NotYetPushed anchorPos ->
-            Just anchorPos
-        BeforeFirstPush ->
-            Nothing
 
 
 view : Model -> Html.Html Msg
@@ -566,3 +485,64 @@ view model =
             ]
         )
     ]
+
+-- util
+
+sign : Int -> Int
+sign n =
+    if n < 0 then
+        -1
+    else
+        1
+
+getGridPos : Position -> Maybe MouseDrag -> PositionKey
+getGridPos {x, y} mouseDrag =
+    case mouseDrag of
+        Just {dragStart, dragCurrent} ->
+            let
+                dxpx =
+                    (dragCurrent.x - dragStart.x)
+                dypx =
+                    (dragCurrent.y - dragStart.y)
+                dx = ( (sign dxpx) * (abs dxpx + (grid_size // 2)) ) // grid_size
+                dy = ( (sign dypx) * (abs dypx + (grid_size // 2)) ) // grid_size
+            in
+                ( x  + dx
+                , y  + dy
+                )
+        Nothing ->
+            ( x, y )
+
+isPositionInBoard : (Int, Int) -> Bool
+isPositionInBoard (x, y) = 
+    Draw.isInBoard x y
+
+getNeighbors : PositionKey -> Set PositionKey
+getNeighbors (x, y) = 
+    List.filter
+        isPositionInBoard
+        [ ((x + 1),  y     )
+        , ((x - 1),  y     )
+        , ( x     , (y + 1))
+        , ( x     , (y - 1))
+        ]
+    |> Set.fromList
+
+breadthFirstSearchImpl : List PositionKey -> Set PositionKey -> List PositionKey -> Set PositionKey
+breadthFirstSearchImpl unexplored occupied explored =
+    case unexplored of
+        [] ->
+            Set.fromList explored
+        x :: xs ->
+            let
+                neighbors = getNeighbors x
+                unexploredNeighbors = Set.diff (Set.diff neighbors (Set.fromList explored)) occupied
+                toExplore = unexploredNeighbors
+                    |> Set.toList
+                    |> List.append xs
+            in
+                breadthFirstSearchImpl toExplore occupied (x :: explored)
+
+breadthFirstSearch : PositionKey -> Set PositionKey -> Set PositionKey
+breadthFirstSearch start occupied =
+    breadthFirstSearchImpl [start] occupied []

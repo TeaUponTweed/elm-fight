@@ -83,7 +83,8 @@ type Moves
 
 type Push
     = NotYetPushed Position
-    | HavePushed (Board, Position)
+    | HavePushed (Board, Position, Position)
+    | FirstPush (Board, Position)
     | BeforeFirstPush
 
 type GameStage
@@ -110,24 +111,34 @@ type alias Model =
     , dragState : DragState
     }
 
+getMoveBoard : Model -> Board
+getMoveBoard model =
+    case model.currentTurn.moves of
+        NoMoves board->
+            board
+        OneMove (_, {board}) ->
+            board
+        TwoMoves (_, _, {board}) ->
+            board
+
 getBoard : Model -> Board
 getBoard model =
     case model.currentTurn.push of
-        HavePushed (board, anchorPos) ->
+        HavePushed (board, _, _) ->
             board
-        _ ->
-            case model.currentTurn.moves of
-                NoMoves board->
-                    board
-                OneMove (_, {board}) ->
-                    board
-                TwoMoves (_, _, {board}) ->
-                    board
+        FirstPush (board, _) ->
+            board
+        BeforeFirstPush ->
+            getMoveBoard model
+        NotYetPushed _ ->
+            getMoveBoard model
 
 getAnchor : Model -> Maybe Position
 getAnchor model =
     case model.currentTurn.push of
-        HavePushed (_, anchorPos) ->
+        HavePushed (_, _, anchorPos) ->
+            Just anchorPos
+        FirstPush (_, anchorPos) ->
             Just anchorPos
         NotYetPushed anchorPos ->
             Just anchorPos
@@ -189,67 +200,90 @@ update msg model =
             , Cmd.none
             )
         EndTurn ->
-            case model.gameStage of
-                WhiteSetup ->
-                    ( { model | gameStage = BlackSetup }
-                    , Cmd.none
-                    )
-                BlackSetup ->
-                    ( { model | gameStage = WhiteTurn }
-                    , Cmd.none
-                    )
-                WhiteTurn ->
-                    if gameOver model then
-                        ( { model | gameStage = WhiteWon }
+            let
+                board =
+                    getBoard model
+                anchor =
+                    getAnchor model
+                nextTurn = case anchor of
+                    Just anchorPos ->
+                        Turn (NoMoves board) (NotYetPushed anchorPos)
+                    Nothing ->
+                        Turn (NoMoves board) BeforeFirstPush
+            in
+                case model.gameStage of
+                    WhiteSetup ->
+                        ( { model | gameStage = BlackSetup }
                         , Cmd.none
                         )
-                    else
-                        ( { model | gameStage = BlackTurn }
-                        , Cmd.none
-                        )
-                BlackTurn ->
-                    if gameOver model then
-                        ( { model | gameStage = BlackWon }
-                        , Cmd.none
-                        )
-                    else
+                    BlackSetup ->
                         ( { model | gameStage = WhiteTurn }
                         , Cmd.none
                         )
-                WhiteWon ->
-                    ( model
-                    , Cmd.none
-                    )
-                BlackWon ->
-                    ( model
-                    , Cmd.none
-                    )
+                    WhiteTurn ->
+                        if gameOver model then
+                            ( { model | gameStage = WhiteWon }
+                            , Cmd.none
+                            )
+                        else
+                            ( { model | gameStage = BlackTurn, currentTurn = nextTurn}
+                            , Cmd.none
+                            )
+                    BlackTurn ->
+                        if gameOver model then
+                            ( { model | gameStage = BlackWon }
+                            , Cmd.none
+                            )
+                        else
+                            ( { model | gameStage = WhiteTurn, currentTurn = nextTurn}
+                            , Cmd.none
+                            )
+                    WhiteWon ->
+                        ( model
+                        , Cmd.none
+                        )
+                    BlackWon ->
+                        ( model
+                        , Cmd.none
+                        )
         Undo ->
-            case model.currentTurn.moves of
-                NoMoves _ ->
-                    ( model
-                    , Cmd.none
-                    )
-                OneMove (board, _) ->
+            case model.currentTurn.push of
+                HavePushed (_, lastAnchorPos, _) ->
                     let
                         turn =
                             model.currentTurn
                         updatedTurn =
-                            { turn | moves = NoMoves board }
+                            { turn | push = NotYetPushed lastAnchorPos }
                     in
                         ( { model | currentTurn = updatedTurn }
                         , Cmd.none
                         )
-                TwoMoves (board, firstMove, _) ->
-                    let
-                        turn =
-                            model.currentTurn
-                        updatedTurn =
-                            { turn | moves = OneMove (board, firstMove) }
-                    in
-                        ( { model | currentTurn = updatedTurn }
-                        , Cmd.none
-                        )
+                _ ->
+                    case model.currentTurn.moves of
+                        NoMoves _ ->
+                            ( model
+                            , Cmd.none
+                            )
+                        OneMove (board, _) ->
+                            let
+                                turn =
+                                    model.currentTurn
+                                updatedTurn =
+                                    { turn | moves = NoMoves board }
+                            in
+                                ( { model | currentTurn = updatedTurn }
+                                , Cmd.none
+                                )
+                        TwoMoves (board, firstMove, _) ->
+                            let
+                                turn =
+                                    model.currentTurn
+                                updatedTurn =
+                                    { turn | moves = OneMove (board, firstMove) }
+                            in
+                                ( { model | currentTurn = updatedTurn }
+                                , Cmd.none
+                                )
 
 gameOver : Model -> Bool
 gameOver model =
@@ -258,6 +292,7 @@ gameOver model =
     in
         Dict.keys board
         |> List.all isPositionInBoard
+        |> not
 
 
 handleDrag : Model -> Position -> Model
@@ -351,7 +386,13 @@ isValidMove model from to =
         (toX, toY) = to
     in
         if Dict.member to board then
-            Occupied
+            case model.gameStage of
+                WhiteSetup ->
+                    InvalidMove
+                BlackSetup ->
+                    InvalidMove
+                _ ->
+                    Occupied
         else
             case pieceToMove of
                 Just {kind, color} ->
@@ -434,14 +475,20 @@ move model from to =
                 case model.currentTurn.push of
                     HavePushed _ ->
                         Debug.log "Can't push twice" model.currentTurn -- TODO display banner "Can't push twice"
-                    _ ->
+                    FirstPush _ ->
+                        Debug.log "Can't push twice" model.currentTurn -- TODO display banner "Can't push twice"
+                    NotYetPushed anchorPos ->
                         case push model from to of
                             Just (pushedBoard, newAnchorPos) ->
-                                {currentTurn | push = HavePushed (pushedBoard, newAnchorPos)}
+                                {currentTurn | push = HavePushed (pushedBoard, anchorPos,newAnchorPos)}
                             Nothing ->
                                 Debug.log "Invalid Push" model.currentTurn -- TODO display banner "Invalid push"
-
-
+                    BeforeFirstPush ->
+                        case push model from to of
+                            Just (pushedBoard, newAnchorPos) ->
+                                {currentTurn | push = FirstPush (pushedBoard, newAnchorPos)}
+                            Nothing ->
+                                Debug.log "Invalid Push" model.currentTurn -- TODO display banner "Invalid push"
         _ ->
             Debug.log "Invalid move" model.currentTurn -- TODO display banner "Invalid move"
 
@@ -597,10 +644,24 @@ view model =
                         ]
                 _ ->
                     []
+        title =
+            case model.gameStage of
+                WhiteSetup ->
+                    "WhiteSetup"
+                BlackSetup ->
+                    "BlackSetup"
+                WhiteTurn ->
+                    "WhiteTurn"
+                BlackTurn ->
+                    "BlackTurn"
+                WhiteWon ->
+                    "WhiteWon"
+                BlackWon ->
+                    "BlackWon"
     in
     Html.div []
-    [
-        Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
+    [ Html.div [] [Html.text title]
+    , Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
         [ Svg.svg 
             [ Svg.Attributes.width totalSize
             , Svg.Attributes.height totalSize

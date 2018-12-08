@@ -258,6 +258,16 @@ update msg model =
                         ( { model | currentTurn = updatedTurn }
                         , Cmd.none
                         )
+                FirstPush _ ->
+                    let
+                        turn =
+                            model.currentTurn
+                        updatedTurn =
+                            { turn | push = BeforeFirstPush }
+                    in
+                        ( { model | currentTurn = updatedTurn }
+                        , Cmd.none
+                        )
                 _ ->
                     case model.currentTurn.moves of
                         NoMoves _ ->

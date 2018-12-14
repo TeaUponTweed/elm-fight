@@ -8,6 +8,7 @@ import Browser.Events
 import Browser.Dom
 
 import Html
+import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 
@@ -114,6 +115,7 @@ type alias Model =
     , dragState : DragState
     , windowWidth : Int
     , gridSize : Int
+    , endTurnOnPush : Bool
     }
 
 getMoveBoard : Model -> Board
@@ -174,7 +176,7 @@ init _ =
         firstMoves = NoMoves startingPieces
         turn = Turn firstMoves BeforeFirstPush
     in
-        ( Model turn WhiteSetup NotDragging 1000 100
+        ( Model turn WhiteSetup NotDragging 1000 100 False
         , Task.perform (WindowWidth << getViewportWidth) Browser.Dom.getViewport
         )
 
@@ -192,6 +194,7 @@ type Msg
     | WindowWidth Int
     | EndTurn
     | Undo
+    | ToggleEndTurnOnPush
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -212,6 +215,10 @@ update msg model =
             )
         WindowWidth width ->
             ( { model | windowWidth = width, gridSize = width // 10 }
+            , Cmd.none
+            )
+        ToggleEndTurnOnPush ->
+            ( { model | endTurnOnPush = not model.endTurnOnPush }
             , Cmd.none
             )
         EndTurn ->
@@ -351,10 +358,23 @@ handleDragEnd model =
     case model.dragState of
         DraggingPiece {piece, from, mouseDrag} ->
             let
-                (toX, toY) = getGridPos from mouseDrag model.gridSize
-                updatedTurn = move model (from.x, from.y) (toX, toY)
+                (toX, toY) =
+                    getGridPos from mouseDrag model.gridSize
+                updatedTurn =
+                    move model (from.x, from.y) (toX, toY)
+                updatedModel =
+                    { model | currentTurn = updatedTurn, dragState = NotDragging}
             in
-                { model | currentTurn = updatedTurn, dragState = NotDragging}
+                if model.endTurnOnPush then
+                    case updatedTurn.push of
+                        HavePushed _ ->
+                            Tuple.first (update EndTurn updatedModel)
+                        FirstPush _ ->
+                            Tuple.first (update EndTurn updatedModel)
+                        _  ->
+                            updatedModel
+                else
+                    updatedModel
         _ ->
             { model | dragState = NotDragging }
 
@@ -661,7 +681,8 @@ view : Model -> Html.Html Msg
 view model =
     let
         size = model.gridSize
-        totalSize = String.fromInt (10*size)
+        width = String.fromInt (10*size)
+        height = String.fromInt (4*size)
         board = getBoard model
         anchor = getAnchor model
         anchorSVGs =
@@ -698,9 +719,9 @@ view model =
     [ Html.div [] [Html.text title]
     , Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
         [ Svg.svg 
-            [ Svg.Attributes.width totalSize
-            , Svg.Attributes.height totalSize
-            , Svg.Attributes.viewBox <| "0 0 " ++ totalSize ++ " " ++ totalSize
+            [ Svg.Attributes.width width
+            , Svg.Attributes.height height
+            , Svg.Attributes.viewBox <| "0 0 " ++ width ++ " " ++ height
             ]
             ( List.concat
                 [ Draw.board size
@@ -713,6 +734,12 @@ view model =
     , Html.div []
         [ Html.button [ Html.Events.onClick EndTurn ] [ Html.text "End Turn" ]
         , Html.button [ Html.Events.onClick Undo ] [ Html.text "Undo" ]
+        ]
+    , Html.div []
+        [ Html.label []
+            [ Html.input [ Html.Attributes.type_ "checkbox", Html.Events.onClick ToggleEndTurnOnPush ] []
+            , Html.text "End Turn on Push"
+            ]
         ]
     ]
 

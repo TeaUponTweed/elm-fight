@@ -243,11 +243,11 @@ update msg model =
                         , Cmd.none
                         )
                     WhiteTurn ->
-                        ( { model | gameStage = turnTransition model }
+                        ( { model | gameStage = turnTransition model, currentTurn = nextTurn }
                         , Cmd.none
                         )
                     BlackTurn ->
-                        ( { model | gameStage = turnTransition model }
+                        ( { model | gameStage = turnTransition model, currentTurn = nextTurn }
                         , Cmd.none
                         )
                     WhiteWon ->
@@ -312,7 +312,7 @@ update msg model =
 
 pieceOutOfBoard : (PositionKey, Piece) -> Maybe Piece
 pieceOutOfBoard (pos, piece) =
-    if isPositionInBoard pos then
+    if not (isPositionInBoard pos) then
         Just piece
     else
         Nothing

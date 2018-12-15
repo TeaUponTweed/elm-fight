@@ -243,23 +243,13 @@ update msg model =
                         , Cmd.none
                         )
                     WhiteTurn ->
-                        if gameOver model then
-                            ( { model | gameStage = WhiteWon }
-                            , Cmd.none
-                            )
-                        else
-                            ( { model | gameStage = BlackTurn, currentTurn = nextTurn}
-                            , Cmd.none
-                            )
+                        ( { model | gameStage = turnTransition model }
+                        , Cmd.none
+                        )
                     BlackTurn ->
-                        if gameOver model then
-                            ( { model | gameStage = BlackWon }
-                            , Cmd.none
-                            )
-                        else
-                            ( { model | gameStage = WhiteTurn, currentTurn = nextTurn}
-                            , Cmd.none
-                            )
+                        ( { model | gameStage = turnTransition model }
+                        , Cmd.none
+                        )
                     WhiteWon ->
                         ( model
                         , Cmd.none
@@ -317,14 +307,48 @@ update msg model =
                                 , Cmd.none
                                 )
 
-gameOver : Model -> Bool
-gameOver model =
+
+
+
+pieceOutOfBoard : (PositionKey, Piece) -> Maybe Piece
+pieceOutOfBoard (pos, piece) =
+    if isPositionInBoard pos then
+        Just piece
+    else
+        Nothing
+
+maybeGet : ( a -> b ) -> Maybe a -> Maybe b
+maybeGet func maybe =
+    case maybe of
+        Just something ->
+            Just (func something)
+        Nothing ->
+            Nothing
+
+
+turnTransition : Model -> GameStage
+turnTransition model =
     let
-        board = getBoard model
+        offBoardPiece = 
+            getBoard model
+            |> Dict.toList
+            |> List.filterMap pieceOutOfBoard
+            |> List.head
     in
-        Dict.keys board
-        |> List.all isPositionInBoard
-        |> not
+        case maybeGet .color offBoardPiece of
+            Just White ->
+                BlackWon
+            Just Black ->
+                WhiteWon
+            Nothing ->
+                case model.gameStage of
+                    BlackTurn ->
+                        WhiteTurn
+                    WhiteTurn ->
+                        BlackTurn
+                    _ ->
+                        model.gameStage
+
 
 
 handleDrag : Model -> Position -> Model

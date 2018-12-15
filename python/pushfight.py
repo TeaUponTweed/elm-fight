@@ -224,3 +224,42 @@ _WHITE_PUSHERS = ('wp1', 'wp2', 'wp3')
 _WHITE_PIECES = ('wp1', 'wp2', 'wp3', 'wm1', 'wm2')
 _BLACK_PUSHERS = ('bp1', 'bp2', 'bp3')
 _BLACK_PIECES = ('bp1', 'bp2', 'bp3', 'bm1', 'bm2')
+    
+def bit_to_xy(bit, board_size=None):
+    if board_size is None:
+        board_size = [4,8]
+    x = bit % board_size[0]
+    y = bit - board_size[0]*x
+    return (x, y)
+
+def bits_to_board(board_bits, is_whites_turn=None, board_size=None):
+    # Set defaults
+    if is_whites_turn is None:
+        is_whites_turn = True
+    if board_size is None:
+        board_size = [4,8]
+
+    occupied = board_bits[0]
+    is_pusher = board_bits[1]
+    is_white = board_bits[2]
+    is_anchor = board_bits[3]
+    N = len(occupied)
+    
+    # Loop over all bits, plugging into the board when occupied
+    n_found = {'wp':0, 'wm':0, 'bp':0, 'bm':0}
+    pieces = {}
+    anchor = None
+    for bit in range(N):
+        if not occupied[bit]:
+            continue
+        xy = bit_to_xy(bit)
+        color = 'w' if is_white[bit] else 'b'
+        piece = 'p' if is_pusher[bit] else 'm'
+        label = color + piece
+        n_found[label] += 1
+        pieces[label+str(n_found[label])] = xy
+        if is_anchor[bit]:
+            anchor = xy
+            assert(is_pusher[bit], 'Anchor not on pusher')
+
+    return Board(pieces, anchor, is_whites_turn)

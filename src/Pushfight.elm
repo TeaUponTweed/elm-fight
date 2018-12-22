@@ -341,13 +341,19 @@ turnTransition model =
             Just Black ->
                 WhiteWon
             Nothing ->
-                case model.gameStage of
-                    BlackTurn ->
-                        WhiteTurn
-                    WhiteTurn ->
-                        BlackTurn
-                    _ ->
+                case model.currentTurn.push of
+                    BeforeFirstPush ->
                         model.gameStage
+                    NotYetPushed _ ->
+                        model.gameStage
+                    _ ->
+                        case model.gameStage of
+                            BlackTurn ->
+                                WhiteTurn
+                            WhiteTurn ->
+                                BlackTurn
+                            _ ->
+                                model.gameStage
 
 
 

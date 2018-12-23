@@ -4,3 +4,4 @@ type Msg
     = GoToLobby
     | CreateNewGame
     | GoToGame String
+    | DoNothing

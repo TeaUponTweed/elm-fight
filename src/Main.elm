@@ -2,6 +2,7 @@ port module Main exposing (updateBoardFromFirebase, getGamesFromFirebase, update
 
 import Json.Decode as Decode
 import Json.Encode as Encode
+import Json.Decode.Pipeline as Pipeline
 
 import Browser
 import Browser.Navigation as Nav
@@ -15,7 +16,7 @@ import List
 import Dict
 
 import Router
-import Board
+import Pushfight
 import Lobby
 
 port updateBoardFromFirebase : (Decode.Value -> msg) -> Sub msg
@@ -43,8 +44,8 @@ main =
 
 
 type alias Model =
-    { board : Maybe Board.Model
-    , lobby : Lobby.Model
+    { lobby : Lobby.Model
+    , board : Maybe Board.Model
     }
 
 
@@ -63,8 +64,11 @@ subscriptions model =
 view : Model -> Html.Html Msg
 view model =
     case model.board of
-        Just board ->
-            Html.map BoardMsg (Board.view board)
+        Just Board board ->
+            Html.div []
+            [ Html.div [] [Html.button [ Html.Events.onClick RouterMsg Router.GoToLobby ] [ Html.text "Back to Lobby" ]]
+            , Html.div [] [Html.map BoardMsg (Board.view board)]
+            ]
         Nothing ->
             Html.map LobbyMsg (Lobby.view model.lobby)
 
@@ -77,7 +81,7 @@ init _ =
     let
         (lobby, _, _) = Lobby.init ()
     in
-        ( Model Nothing lobby
+        ( Model Lobby lobby
         , Cmd.none
         )
 
@@ -88,8 +92,8 @@ init _ =
 
 
 type Msg
-    = RouterMsg (Maybe Router.Msg)
-    | BoardMsg Board.Msg
+    = RouterMsg Router.Msg
+    | BoardMsg Pushfight.Msg
     | LobbyMsg Lobby.Msg
     | DecodeActiveGamesList Decode.Value
     | DecodeBoard Decode.Value
@@ -99,19 +103,19 @@ update message model =
     case message of
         RouterMsg msg ->
             case msg of
-                Just Router.GoToLobby ->
-                    ( {model | board = Nothing }
+                Router.GoToLobby ->
+                    ( {model | page =  }
                     , Cmd.none
                     )
-                Just (Router.GoToGame gameID) ->
+                Router.GoToGame gameID ->
                     ( model
                     , requestBoardFromFirebase (Encode.string gameID)
                     )
-                Just Router.CreateNewGame ->
+                Router.CreateNewGame ->
                     ( model
                     , createNewGame Encode.null
                     )
-                Nothing ->
+                DoNothing ->
                     ( model
                     , Cmd.none
                     )
@@ -222,17 +226,68 @@ firebaseSubscriptions model =
         , updateBoardFromFirebase DecodeBoard
         ]
 
+
 type alias DecodedBoard =
-    { board : Dict.Dict String Bool
+    { wp1 : Int
+    , wp2 : Int
+    , wp3 : Int
+    , wm1 : Int
+    , wm2 : Int
+    , bp1 : Int
+    , bp2 : Int
+    , bp3 : Int
+    , bm1 : Int
+    , bm2 : Int
+    , anc : Int
     , gameID : String
     }
 
+
 decodeBoard : Decode.Decoder DecodedBoard
 decodeBoard = 
-    Decode.map2 DecodedBoard
-        (Decode.field "set_pieces" (Decode.dict Decode.bool))
-        (Decode.field "gameID" Decode.string)
+    Decode.succeed ProperBoard
+        |> Pipeline.required "wp1" Decode.int
+        |> Pipeline.required "wp2" Decode.int
+        |> Pipeline.required "wp3" Decode.int
+        |> Pipeline.required "wm1" Decode.int
+        |> Pipeline.required "wm2" Decode.int
+        |> Pipeline.required "bp1" Decode.int
+        |> Pipeline.required "bp2" Decode.int
+        |> Pipeline.required "bp3" Decode.int
+        |> Pipeline.required "bm1" Decode.int
+        |> Pipeline.required "bm2" Decode.int
+        |> Pipeline.required "anc" Decode.int
+        |> Pipeline.required "gameID" Decode.string
 
+encodeBoardImpl : List ((Int, Int), (Pushfight.Piece)) -> Dict String Int -> Int -> Int -> Int -> Int -> Dict String Int
+encodeBoardImpl pieces transformedBoard blackMoverCounter whiteMoverCounter whitePusherCounter blackPusherCounter =
+    case pieces of
+        [((x, y), {piece, kind}] :: otherPieces ->
+            let
+                (name, updatedblackMoverCounter, updatedwhiteMoverCounter, updatedwhitePusherCounter, updatedblackPusherCounter) =
+                    case (piece, kind) of
+                        (Black, Pusher) ->
+                            ( "bp" ++ <| String.fromInt <| blackPusherCounter + 1
+                            , blackMoverCounter, whiteMoverCounter, whitePusherCounter, blackPusherCounter + 1
+                            )
+                        (White, Pusher) ->
+                            ( "wp" ++ <| String.fromInt <| whitePusherCounter + 1
+                            , blackMoverCounter, whiteMoverCounter, whitePusherCounter + 1, blackPusherCounter
+                            )
+                        (Black, Mover) ->
+                            ( "bm" ++ <| String.fromInt <| blackMoverCounter + 1
+                            , blackMoverCounter + 1, whiteMoverCounter, whitePusherCounter, blackPusherCounter
+                            )
+                        (White, Mover) ->
+                            ( "wm" ++ <| String.fromInt <| whiteMoverCounter + 1
+                            , blackMoverCounter, whiteMoverCounter + 1, whitePusherCounter, blackPusherCounter
+                            )
+                pos =
+                    x+y*10
+            in
+                encodeBoardImpl otherPieces <| Dict.insert name pos
+                    <| blackMoverCounter
+                    <| updatedblackMoverCounter updatedwhiteMoverCounter updatedwhitePusherCounter updatedblackPusherCounter
 
 encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
 encodeBoardImpl (key, val) = 

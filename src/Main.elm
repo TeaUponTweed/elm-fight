@@ -34,7 +34,7 @@ main : Program () Model Msg
 main =
     Browser.document
         { init = init
-        , view = \model -> { title = "Elm • TodoMVC", body = [view model] }
+        , view = \model -> { title = "Pushfight in Elm", body = [view model] }
         , update = update
         , subscriptions = subscriptions
         }
@@ -104,7 +104,7 @@ update message model =
         RouterMsg msg ->
             case msg of
                 Router.GoToLobby ->
-                    ( {model | page =  }
+                    ( {model | board = Nothing }
                     , Cmd.none
                     )
                 Router.GoToGame gameID ->
@@ -228,36 +228,96 @@ firebaseSubscriptions model =
 
 
 type alias DecodedBoard =
-    { wp1 : Int
-    , wp2 : Int
-    , wp3 : Int
-    , wm1 : Int
-    , wm2 : Int
-    , bp1 : Int
-    , bp2 : Int
-    , bp3 : Int
-    , bm1 : Int
-    , bm2 : Int
-    , anc : Int
-    , gameID : String
+    { wp1          : Int
+    , wp2          : Int
+    , wp3          : Int
+    , wm1          : Int
+    , wm2          : Int
+    , bp1          : Int
+    , bp2          : Int
+    , bp3          : Int
+    , bm1          : Int
+    , bm2          : Int
+    , anchor       : Maybe Int
+    , move1from    : Maybe Int
+    , move1to      : Maybe Int
+    , move2from    : Maybe Int
+    , move2to      : Maybe Int
+    , pushFrom     : Maybe Int
+    , pushTo       : Maybe Int
+    , gameID       : String
+    , isSetup      : Bool
+    , isWhitesTurn : Bool
     }
 
 
 decodeBoard : Decode.Decoder DecodedBoard
 decodeBoard = 
     Decode.succeed ProperBoard
-        |> Pipeline.required "wp1" Decode.int
-        |> Pipeline.required "wp2" Decode.int
-        |> Pipeline.required "wp3" Decode.int
-        |> Pipeline.required "wm1" Decode.int
-        |> Pipeline.required "wm2" Decode.int
-        |> Pipeline.required "bp1" Decode.int
-        |> Pipeline.required "bp2" Decode.int
-        |> Pipeline.required "bp3" Decode.int
-        |> Pipeline.required "bm1" Decode.int
-        |> Pipeline.required "bm2" Decode.int
-        |> Pipeline.required "anc" Decode.int
-        |> Pipeline.required "gameID" Decode.string
+        |> Pipeline.required "wp1"          Decode.int
+        |> Pipeline.required "wp2"          Decode.int
+        |> Pipeline.required "wp3"          Decode.int
+        |> Pipeline.required "wm1"          Decode.int
+        |> Pipeline.required "wm2"          Decode.int
+        |> Pipeline.required "bp1"          Decode.int
+        |> Pipeline.required "bp2"          Decode.int
+        |> Pipeline.required "bp3"          Decode.int
+        |> Pipeline.required "bm1"          Decode.int
+        |> Pipeline.required "bm2"          Decode.int
+        |> Pipeline.optional "anchor"       Decode.int Nothing
+        |> Pipeline.optional "move1from"    Decode.int Nothing
+        |> Pipeline.optional "move1to"      Decode.int Nothing
+        |> Pipeline.optional "move2from"    Decode.int Nothing
+        |> Pipeline.optional "move2to"      Decode.int Nothing
+        |> Pipeline.optional "pushFrom"     Decode.int Nothing
+        |> Pipeline.optional "pushTo"       Decode.int Nothing
+        |> Pipeline.required "gameID"       Decode.string
+        |> Pipeline.required "isSetup"      Decode.bool
+        |> Pipeline.required "isWhitesTurn" Decode.bool
+
+
+indexToXY : Int -> (Int, Int)
+indexToXY ix =
+    (modBy ix 10, ix // 10)
+
+
+xyToIndex : (Int, Int) -> Int
+xyToIndex (x, y) =
+    x + y * 10
+
+
+posToIndex : Position -> Int
+posToIndex {x, y} =
+    x + y * 10
+
+
+decodedBoardToBoard : DecodedBoard -> Board
+decodedBoardToBoard decodedBoard =
+    let
+        board =
+            Dict.empty
+            |> Dict.insert (indexToXY decodedBoard.wp1) Piece Pusher White 
+            |> Dict.insert (indexToXY decodedBoard.wp2) Piece Pusher White 
+            |> Dict.insert (indexToXY decodedBoard.wp3) Piece Pusher White 
+            |> Dict.insert (indexToXY decodedBoard.wm1) Piece Mover  White 
+            |> Dict.insert (indexToXY decodedBoard.wm2) Piece Mover  White 
+            |> Dict.insert (indexToXY decodedBoard.bp1) Piece Pusher Black 
+            |> Dict.insert (indexToXY decodedBoard.bp2) Piece Pusher Black 
+            |> Dict.insert (indexToXY decodedBoard.bp3) Piece Pusher Black 
+            |> Dict.insert (indexToXY decodedBoard.bm1) Piece Mover  Black 
+            |> Dict.insert (indexToXY decodedBoard.bm2) Piece Mover  Black 
+        move =
+            case (decodedBoard.move1from, decodedBoard.move1to, decodedBoard.move2from, decodedBoard.move2to) of
+                (Some m1from, Some m1to, Some m2from, Some m2to) ->
+                    TwoMoves(board, Move(m1from, m1to), Move(m2from, m2to))
+                (Some m1from, Some m1to, Nothing, Nothing)
+                    OneMove(board, Move(m1from, m1to))
+                _ ->
+                    NoMoves board
+        push = HavePushed()
+                --(Nothing, Nothing, Nothing, Nothing)
+    in
+
 
 encodeBoardImpl : List ((Int, Int), (Pushfight.Piece)) -> Dict String Int -> Int -> Int -> Int -> Int -> Dict String Int
 encodeBoardImpl pieces transformedBoard blackMoverCounter whiteMoverCounter whitePusherCounter blackPusherCounter =
@@ -285,25 +345,72 @@ encodeBoardImpl pieces transformedBoard blackMoverCounter whiteMoverCounter whit
                 pos =
                     x+y*10
             in
-                encodeBoardImpl otherPieces <| Dict.insert name pos
+                encodeBoardImpl 
+                    <| otherPieces
+                    <| Dict.insert transformedBoard name pos
                     <| blackMoverCounter
                     <| updatedblackMoverCounter updatedwhiteMoverCounter updatedwhitePusherCounter updatedblackPusherCounter
 
-encodeBoardImpl : (String, Bool) -> (String, Encode.Value)
-encodeBoardImpl (key, val) = 
-    (key, Encode.bool val)
 
-
-encodeBoard : Board.Model -> Encode.Value
-encodeBoard game =
-    game.board
-        |> Dict.toList
-        |> List.map encodeBoardImpl
-        |> Encode.object
-
-encodeGame : Board.Model -> Encode.Value
-encodeGame game =
+encodeGame : Board.Model -> String -> Encode.Value
+encodeGame game gameId=
+    let
+        encodedBoard =
+            encodeBoardImpl (Dict.toList getBoard game) Dict.empty 0 0 0 0
+        moveList =
+            case game.turn.moves of
+                NoMoves ->
+                    []
+                OneMove (_, {from, to}) ->
+                    [ ("move1from", Encode.int <| xyToIndex from)
+                    , ("move1to"  , Encode.int <| xyToIndex to)
+                    ]
+                TwoMoves (_, move1, move2) ->
+                    [ ("move1from", Encode.int <| xyToIndex move1.from)
+                    , ("move1to"  , Encode.int <| xyToIndex move1.to)
+                    , ("move2from", Encode.int <| xyToIndex move2.from)
+                    , ("move2to"  , Encode.int <| xyToIndex move2.to)
+                    ]
+        pushList =
+            case game.turn.push of
+                FirstPush {board, anchorPos, from, to} ->
+                    [ ("pushFrom", Encode.int <| xyToIndex from)
+                    , ("pushTo"  , Encode.int <| xyToIndex to)
+                    , ("anchor"  , Encode.int <| xyToIndex anchorPos)
+                    , ("isSetup" , False)
+                    ]
+                HavePushed {board, anchorPos, from, to} ->
+                    [ ("pushFrom", Encode.int <| xyToIndex from)
+                    , ("pushTo"  , Encode.int <| xyToIndex to)
+                    , ("anchor"  , Encode.int <| xyToIndex anchorPos)
+                    , ("isSetup" , Encode.bool False)
+                    ]
+                BeforeFirstPush ->
+                    [ ("isSetup", Encode.bool True)
+                    ]
+                NotYetPushed -> -- We shoudn't be here (maybe this should live in some sort of interface layer, bleh)
+                    []
+        turnList =
+            case game.gameStage of
+                WhiteSetup ->
+                    [ ("isWhitesTurn", Encode.bool True)
+                    ]
+                BlackSetup ->
+                    [ ("isWhitesTurn", Encode.bool False)
+                    ]
+                WhiteTurn ->
+                    [ ("isWhitesTurn", Encode.bool True)
+                    ]
+                BlackTurn ->
+                    [ ("isWhitesTurn", Encode.bool False)
+                    ]
+                WhiteWon ->
+                    [ ("isWhitesTurn", encode.bool True)
+                    ]
+                BlackWon ->
+                    [ ("isWhitesTurn", encode.bool False)
+                    ]
+    in
+        
     Encode.object
-        [ ( "board", encodeBoard game )
-        , ( "gameID", Encode.string game.gameID)
-        ]
+            <| encodedBoard ++ pushList ++ turnList ++ [ ("gameID"      , gameID) ]

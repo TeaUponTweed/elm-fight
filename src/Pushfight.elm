@@ -1,3 +1,5 @@
+module Pushfight exposing (init, update, view, Msg, Model)
+
 import Debug
 
 import Dict exposing (Dict)
@@ -77,7 +79,8 @@ type alias MouseDrag =
 
 type alias Move =
     { board : Board
-    , lastMovedPiece : PositionKey
+    , from : PositionKey
+    , to : PositionKey
     }
 
 type Moves
@@ -86,9 +89,9 @@ type Moves
     | TwoMoves (Board, Move, Move)
 
 type Push
-    = NotYetPushed Position
-    | HavePushed (Board, Position, Position)
-    | FirstPush (Board, Position)
+    = NotYetPushed {anchorPos: Position}
+    | HavePushed {board: Board, previousAnchorPos: Position, anchorPos: Position, from: PositionKey, to: PositionKey}
+    | FirstPush {board: Board, anchorPos: Position, from: PositionKey, to: PositionKey}
     | BeforeFirstPush
 
 type GameStage
@@ -520,15 +523,15 @@ move model from to =
                     _ ->
                         case turn.moves of
                             NoMoves initialBoard ->
-                                {turn | moves = OneMove (initialBoard, Move updatedBoard to) }
+                                {turn | moves = OneMove (initialBoard, Move updatedBoard from to) }
                             OneMove (initialBoard, {board, lastMovedPiece}) ->
                                 if from == lastMovedPiece then
-                                    {turn | moves = OneMove (initialBoard, Move updatedBoard to) }
+                                    {turn | moves = OneMove (initialBoard, Move updatedBoard from to) }
                                 else
-                                    {turn | moves = TwoMoves (initialBoard, Move board lastMovedPiece, Move updatedBoard to) }
+                                    {turn | moves = TwoMoves (initialBoard, Move board lastMovedPiece, Move updatedBoard from to) }
                             TwoMoves (initialBoard, firstMove, {board, lastMovedPiece}) ->
                                 if from == lastMovedPiece then
-                                    {turn | moves = TwoMoves (initialBoard, firstMove, Move updatedBoard to) }
+                                    {turn | moves = TwoMoves (initialBoard, firstMove, Move updatedBoard from to) }
                                 else
                                     Debug.log "Too may moves" model.currentTurn -- TODO display banner "Too many moves"
         ValidSetupMove ->
@@ -546,16 +549,16 @@ move model from to =
                         Debug.log "Can't push twice" model.currentTurn -- TODO display banner "Can't push twice"
                     FirstPush _ ->
                         Debug.log "Can't push twice" model.currentTurn -- TODO display banner "Can't push twice"
-                    NotYetPushed anchorPos ->
+                    NotYetPushed {anchorPos} ->
                         case push model from to of
                             Just (pushedBoard, newAnchorPos) ->
-                                {currentTurn | push = HavePushed (pushedBoard, anchorPos,newAnchorPos)}
+                                {currentTurn | push = HavePushed pushedBoard anchorPos newAnchorPos from to}
                             Nothing ->
                                 Debug.log "Invalid Push" model.currentTurn -- TODO display banner "Invalid push"
                     BeforeFirstPush ->
                         case push model from to of
                             Just (pushedBoard, newAnchorPos) ->
-                                {currentTurn | push = FirstPush (pushedBoard, newAnchorPos)}
+                                {currentTurn | push = FirstPush pushedBoard newAnchorPos from to}
                             Nothing ->
                                 Debug.log "Invalid Push" model.currentTurn -- TODO display banner "Invalid push"
         _ ->

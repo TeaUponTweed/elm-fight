@@ -1,100 +1,19 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <title>Main</title>
-  <!-- Compiled and minified CSS -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
-  <script src="elm.js"></script>
-</head>
+  <head>
+    <link rel="stylesheet" 
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 
-<script src="https://www.gstatic.com/firebasejs/5.5.8/firebase.js"></script>
+  </head>
 
-<script>
-  // Initialize Firebase
-  var config = {
-    apiKey: "AIzaSyDCtMMZovJXoBaJfvMho1_8ySjxQKyl2t4",
-    authDomain: "elm-fight.firebaseapp.com",
-    databaseURL: "https://elm-fight.firebaseio.com",
-    projectId: "elm-fight",
-    storageBucket: "elm-fight.appspot.com",
-    messagingSenderId: "894465552065"
-  };
-
-  firebase.initializeApp(config);
-</script>
-
-
-<body>
-  <div id="elm"></div>
-  <script>
-  var app = Elm.Main.init({
-    node: document.getElementById('elm')
-  });
-
-  var firestore = firebase.firestore()
-  const settings = {timestampsInSnapshots: true};
-  var lastGameID = null
-  firestore.settings(settings);
-
-  function updateBoard(gameID, board) {
-    var boardRef = firestore.collection('board').doc(gameID)
-    boardRef.set({'set_pieces': board}).then(() => {
-      console.log('Uploaded board to firestore')
-    }).catch(function (error) {
-      console.log('Failed to upload board to firestore ', error)
-    })
-  }
-
-  function getBoardFromFirebase(gameID) {
-    console.log("Subscribing to updated from " + gameID)
-    firestore.collection('board').doc(gameID)
-      .onSnapshot((doc) => {
-        app.ports.updateBoardFromFirebase.send({
-          'set_pieces': doc.data()['set_pieces'],
-          'gameID': doc.id
-        })
-      })
-  }
-
-  // send board to firebase
-  app.ports.updateBoardToFirebase.subscribe(function(data) {
-    board = data['board']
-    gameID = data['gameID']
-    updateBoard(gameID, board)
-  })
-
-  // list games
-  firestore.collection("board").get().then((querySnapshot) => {
-    var games = []
-    querySnapshot.forEach((doc) => {
-      // doc.data() is never undefined for query doc snapshots
-      // console.log(doc.id, " => ", doc.data());
-      games.push(doc.id)
-    });
-    app.ports.getGamesFromFirebase.send(games)
-  });
-  app.ports.requestBoardFromFirebase.subscribe((gameID) => {
-    getBoardFromFirebase(gameID)
-  })
-  // create new game
-  app.ports.createNewGame.subscribe((data) => {
-    var board = {
-      'set_pieces': {}
-    }
-    firestore.collection("board").add(board)
-    .then((doc) => {
-        console.log("Document written with ID: ", doc.id);
-        // lastGameID = doc.id
-        board['gameID'] = doc.id
-        app.ports.updateBoardFromFirebase.send(board)
-        
-    })
-    .catch((error) => {
-        console.error("Error adding document: ", error);
-    });
-  })
-
-  </script>
-</body>
+  <body>
+    <div id="elm-app-is-loaded-here"></div>
+    
+    <script src="elm.js"></script>
+    <script>
+      var app = Elm.PF.init({
+        node: document.getElementById("elm-app-is-loaded-here")
+      });      
+    </script>
+  </body>
 </html>

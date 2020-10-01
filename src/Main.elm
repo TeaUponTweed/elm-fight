@@ -19,7 +19,11 @@ import Svg.Attributes
 
 import Task
 
-import Json.Decode as Decode
+import Json.Decode as Decode exposing (Decoder)
+--import Json.Decode as Decode exposing (Decoder, decodeString, float, int, nullable, string)
+import Json.Decode.Pipeline as DecodePipeline
+
+import Json.Encode as Encode
 
 import Draw
 import PFTypes exposing (..)
@@ -312,13 +316,21 @@ update msg model =
                         , Cmd.none
                         )
                     WhiteTurn ->
-                        ( { model | gameStage = turnTransition model, currentTurn = nextTurn }
-                        , Cmd.none
-                        )
+                        case model.currentTurn.push of
+                            Just push ->
+                                ( { model | gameStage = turnTransition (getBoard model) model.gameStage, currentTurn = nextTurn }
+                                , Cmd.none
+                                )
+                            Nothing ->
+                                ( model, Cmd.none)
                     BlackTurn ->
-                        ( { model | gameStage = turnTransition model, currentTurn = nextTurn }
-                        , Cmd.none
-                        )
+                        case model.currentTurn.push of
+                            Just push ->
+                                ( { model | gameStage = turnTransition (getBoard model) model.gameStage, currentTurn = nextTurn }
+                                , Cmd.none
+                                )
+                            Nothing ->
+                                ( model, Cmd.none)
                     WhiteWon ->
                         ( model
                         , Cmd.none
@@ -506,11 +518,11 @@ maybeGet func maybe =
             Nothing
 
 
-turnTransition : Model -> GameStage
-turnTransition model =
+turnTransition : Board -> GameStage -> GameStage
+turnTransition board gameStage =
     let
-        offBoardPiece = 
-            getBoard model
+        offBoardPiece =
+            board
             |> .pieces
             |> Dict.toList
             |> List.filterMap pieceOutOfBoard
@@ -522,13 +534,201 @@ turnTransition model =
             Just Black ->
                 WhiteWon
             Nothing ->
-                case model.gameStage of
+                case gameStage of
                     BlackTurn ->
                         WhiteTurn
                     WhiteTurn ->
                         BlackTurn
                     _ ->
-                        model.gameStage
+                        gameStage
 
---applyMove : Board -> Move -> Board
---applyMove board move =
+encodeModel: Model -> Encode.Value
+encodeModel model =
+    let
+        wasSetup =
+            case model.gameStage of
+                BlackSetup ->
+                    True
+                WhiteSetup ->
+                    True
+                _ ->
+                    False
+        wasWhitesTurn =
+            case model.gameStage of
+                WhiteTurn ->
+                    True
+                WhiteSetup ->
+                    True
+                _ ->
+                    False
+        --gameOver = case model.gameStage of
+        --        WhiteWon ->
+        --            True
+        --        BlackWon ->
+        --            True
+        --        _ ->
+        --            False
+
+        board = getBoard model
+        isPusher: (PositionKey, Piece) -> Bool
+        isPusher (l,p) =
+            case p.kind of
+                Pusher ->
+                    True
+                Mover ->
+                    False
+        isMover: (PositionKey, Piece) -> Bool
+        isMover (l,p) = not (isPusher (l,p))
+
+        isWhite: (PositionKey, Piece) -> Bool
+        isWhite (l,p) =
+            case p.color of
+                White ->
+                    True
+                Black ->
+                    False
+        isBlack: (PositionKey, Piece) -> Bool
+        isBlack (l,p) = not (isWhite (l,p))
+
+        wps =
+            Dict.toList board.pieces
+            |> List.filter isPusher
+            |> List.filter isWhite
+            |> List.map Tuple.first
+
+        bps =
+            Dict.toList board.pieces
+            |> List.filter isPusher
+            |> List.filter isBlack
+            |> List.map Tuple.first
+
+        wms =
+            Dict.toList board.pieces
+            |> List.filter isMover
+            |> List.filter isWhite
+            |> List.map Tuple.first
+
+        bms =
+            Dict.toList board.pieces
+            |> List.filter isMover
+            |> List.filter isBlack
+            |> List.map Tuple.first
+        keyToIx: (Int, Int) -> Int
+        keyToIx (x, y) =
+            10*y+x
+        anc =
+            case board.anchor of
+                Just {x,y} ->
+                    (x,y)
+                    --pos
+                Nothing ->
+                    (0,0)
+                    --{x=0,y=0}
+
+    in
+        case ((wps, bps), (wms, bms)) of
+            (([wp1, wp2, wp3], [bp1, bp2, bp3]), ([wm1, wm2], [bm1, bm2])) ->
+                Encode.object
+                    [ ("wp1", wp1 |> keyToIx |> Encode.int)
+                    , ("wp2", wp2 |> keyToIx |> Encode.int)
+                    , ("wp3", wp3 |> keyToIx |> Encode.int)
+                    , ("wm1", wm1 |> keyToIx |> Encode.int)
+                    , ("wm2", wm2 |> keyToIx |> Encode.int)
+                    , ("bp1", bp1 |> keyToIx |> Encode.int)
+                    , ("bp2", bp2 |> keyToIx |> Encode.int)
+                    , ("bp3", bp3 |> keyToIx |> Encode.int)
+                    , ("bm1", bm1 |> keyToIx |> Encode.int)
+                    , ("bm2", bm2 |> keyToIx |> Encode.int)
+                    , ("anc", anc |> keyToIx |> Encode.int)
+                    , ("wasSetup",  Encode.bool wasSetup)
+                    , ("wasWhitesTurn", Encode.bool wasWhitesTurn)
+                    --, ("gameOver", Encode.bool gameOver)
+                    ]
+            _ ->
+                Encode.null
+
+type alias DecodedBoard =
+    { wp1 : Int
+    , wp2 : Int
+    , wp3 : Int
+    , wm1 : Int
+    , wm2 : Int
+    , bp1 : Int
+    , bp2 : Int
+    , bp3 : Int
+    , bm1 : Int
+    , bm2 : Int
+    , anchor : Int
+    , wasSetup : Bool
+    , wasWhitesTurn : Bool
+    --, gameOver : Bool
+    }
+
+modelDecoder: Decode.Decoder DecodedBoard
+modelDecoder =
+    Decode.succeed DecodedBoard
+        |> DecodePipeline.required "wp1" Decode.int
+        |> DecodePipeline.required "wp2" Decode.int
+        |> DecodePipeline.required "wp3" Decode.int
+        |> DecodePipeline.required "wm1" Decode.int
+        |> DecodePipeline.required "wm2" Decode.int
+        |> DecodePipeline.required "bp1" Decode.int
+        |> DecodePipeline.required "bp2" Decode.int
+        |> DecodePipeline.required "bp3" Decode.int
+        |> DecodePipeline.required "bm1" Decode.int
+        |> DecodePipeline.required "bm2" Decode.int
+        |> DecodePipeline.required "anchor" Decode.int
+        |> DecodePipeline.required "wasSetup" Decode.bool
+        |> DecodePipeline.required "wasWhitesTurn" Decode.bool
+        --|> DecodePipeline.required "gameOver" Decode.bool
+
+updateModelFromDecode : Model -> DecodedBoard -> Model
+updateModelFromDecode model decoded =
+    let
+        ixToKey: Int -> PositionKey
+        ixToKey ix =
+            (modBy ix 10, ix // 10)
+
+        pieces =
+            [ (decoded.wp1 |> ixToKey, Piece Pusher White)
+            , (decoded.wp2 |> ixToKey, Piece Pusher White)
+            , (decoded.wp3 |> ixToKey, Piece Pusher White)
+            , (decoded.wm1 |> ixToKey, Piece Mover White)
+            , (decoded.wm2 |> ixToKey, Piece Mover White)
+            , (decoded.bp1 |> ixToKey, Piece Pusher Black)
+            , (decoded.bp2 |> ixToKey, Piece Pusher Black)
+            , (decoded.bp3 |> ixToKey, Piece Pusher Black)
+            , (decoded.bm1 |> ixToKey, Piece Mover Black)
+            , (decoded.bm2 |> ixToKey, Piece Mover Black)
+            ]
+            |> Dict.fromList
+        anchor =
+            if decoded.anchor == 0 then
+                Nothing
+            else
+                let
+                    (x,y) = ixToKey decoded.anchor
+                in
+                    Just {x = x , y = y}
+        board =
+            Board pieces anchor
+
+        gameStage =
+            case (decoded.wasSetup, decoded.wasWhitesTurn) of
+                (False, False) ->
+                    turnTransition board BlackTurn
+                (False, True) ->
+                    turnTransition board WhiteTurn
+                (True, False) ->
+                    turnTransition board BlackSetup
+                (True, True) ->
+                    turnTransition board WhiteSetup
+
+
+        turn =
+            Turn [] Nothing board
+    in
+        { model
+        | currentTurn = turn
+        , gameStage = gameStage
+        }

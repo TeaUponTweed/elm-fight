@@ -65,7 +65,6 @@ type alias Turn =
     { moves : List Move
     , push  : Maybe Move
     , startingBoard : Board
-    --, startingAncor: Maybe Position
     }
 
 type DragState

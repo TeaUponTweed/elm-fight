@@ -1,6 +1,6 @@
-module PF exposing (init, update, view, Msg, Model)
+module Main exposing (init, update, view, Msg, Model)
 
-import Debug
+--import Debug
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -79,7 +79,8 @@ position =
 
 getWidthFromResize : Int -> Int -> Msg
 getWidthFromResize width height =
-    WindowWidth (Debug.log "width" width)
+    --WindowWidth (Debug.log "width" width)
+    WindowWidth width
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -292,8 +293,8 @@ update msg model =
             let
                 board =
                     getBoard model
-                anchor =
-                    getAnchor model
+                --anchor =
+                    --getAnchor model
                 nextTurn = Turn [] Nothing board
                     --case anchor of
                     --Just anchor ->
@@ -303,11 +304,11 @@ update msg model =
             in
                 case model.gameStage of
                     WhiteSetup ->
-                        ( { model | gameStage = BlackSetup }
+                        ( { model | gameStage = BlackSetup, currentTurn = nextTurn }
                         , Cmd.none
                         )
                     BlackSetup ->
-                        ( { model | gameStage = WhiteTurn }
+                        ( { model | gameStage = WhiteTurn, currentTurn = nextTurn }
                         , Cmd.none
                         )
                     WhiteTurn ->

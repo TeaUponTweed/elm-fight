@@ -542,6 +542,23 @@ turnTransition board gameStage =
                     _ ->
                         gameStage
 
+type alias CodedMove =
+    { from_x: Int
+    , from_y: Int
+    , to_x: Int
+    , to_y: Int
+    }
+
+encodeMove: CodedMove -> Encode.Value
+encodeMove cm =
+    Encode.object
+        [ ("from_x", Encode.int cm.from_x)
+        , ("from_y", Encode.int cm.from_y)
+        , ("to_x", Encode.int cm.to_x)
+        , ("to_y", Encode.int cm.to_y)
+        ]
+
+
 encodeModel: Model -> Encode.Value
 encodeModel model =
     let
@@ -569,7 +586,7 @@ encodeModel model =
         --        _ ->
         --            False
 
-        board = getBoard model
+        board = model.currentTurn.startingBoard
         isPusher: (PositionKey, Piece) -> Bool
         isPusher (l,p) =
             case p.kind of
@@ -624,6 +641,28 @@ encodeModel model =
                 Nothing ->
                     (0,0)
                     --{x=0,y=0}
+        moveToCodedMove: Move -> CodedMove
+        moveToCodedMove {from, to} =
+            let
+                (from_x, from_y) = from
+                (to_x, to_y) = to
+            in
+                { from_x = from_x
+                , from_y = from_y
+                , to_x = to_x
+                , to_y = to_y
+                }
+        pushes =
+            case model.currentTurn.push of
+                Just push ->
+                    [push]
+                Nothing ->
+                    [] 
+        codedMoves =
+            model.currentTurn.moves ++ pushes
+            |> List.map moveToCodedMove                
+
+
 
     in
         case ((wps, bps), (wms, bms)) of
@@ -642,10 +681,13 @@ encodeModel model =
                     , ("anc", anc |> keyToIx |> Encode.int)
                     , ("wasSetup",  Encode.bool wasSetup)
                     , ("wasWhitesTurn", Encode.bool wasWhitesTurn)
+                    , ("moves", Encode.list encodeMove codedMoves)
                     --, ("gameOver", Encode.bool gameOver)
                     ]
             _ ->
                 Encode.null
+
+
 
 type alias DecodedBoard =
     { wp1 : Int
@@ -661,8 +703,17 @@ type alias DecodedBoard =
     , anchor : Int
     , wasSetup : Bool
     , wasWhitesTurn : Bool
+    , moves: List CodedMove
     --, gameOver : Bool
     }
+
+moveDecoder: Decode.Decoder CodedMove
+moveDecoder =
+    Decode.succeed CodedMove
+        |> DecodePipeline.required "from_x" Decode.int
+        |> DecodePipeline.required "from_y" Decode.int
+        |> DecodePipeline.required "to_x" Decode.int
+        |> DecodePipeline.required "to_y" Decode.int
 
 modelDecoder: Decode.Decoder DecodedBoard
 modelDecoder =
@@ -680,6 +731,7 @@ modelDecoder =
         |> DecodePipeline.required "anchor" Decode.int
         |> DecodePipeline.required "wasSetup" Decode.bool
         |> DecodePipeline.required "wasWhitesTurn" Decode.bool
+        |> DecodePipeline.required "moves" (Decode.list moveDecoder)
         --|> DecodePipeline.required "gameOver" Decode.bool
 
 updateModelFromDecode : Model -> DecodedBoard -> Model
@@ -702,6 +754,24 @@ updateModelFromDecode model decoded =
             , (decoded.bm2 |> ixToKey, Piece Mover Black)
             ]
             |> Dict.fromList
+
+        codedMoveToMove: CodedMove -> Move
+        codedMoveToMove {from_x, from_y, to_x, to_y} =
+            { from = (from_x, from_y)
+            , to = (to_x, to_y)
+            }
+
+        (moves, push) =
+            case (List.map codedMoveToMove decoded.moves) of
+                [m] ->
+                    ([], Just m)
+                [m1, m2] ->
+                    ([m1], Just m2)
+                [m1, m2, m3] ->
+                    ([m1, m2], Just m3)
+                _ ->
+                    ([], Nothing)
+
         anchor =
             if decoded.anchor == 0 then
                 Nothing
@@ -716,19 +786,22 @@ updateModelFromDecode model decoded =
         gameStage =
             case (decoded.wasSetup, decoded.wasWhitesTurn) of
                 (False, False) ->
-                    turnTransition board BlackTurn
+                    BlackTurn
                 (False, True) ->
-                    turnTransition board WhiteTurn
+                    WhiteTurn
                 (True, False) ->
-                    turnTransition board BlackSetup
+                    BlackSetup
                 (True, True) ->
-                    turnTransition board WhiteSetup
+                    WhiteSetup
 
 
         turn =
-            Turn [] Nothing board
-    in
-        { model
-        | currentTurn = turn
-        , gameStage = gameStage
-        }
+            Turn moves push board
+        decodedModel = 
+            { model
+            | currentTurn = turn
+            , gameStage = gameStage
+            }
+        in
+            update EndTurn decodedModel
+            |> Tuple.first

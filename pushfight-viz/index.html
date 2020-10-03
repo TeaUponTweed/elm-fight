@@ -28,9 +28,6 @@
             closeConn();
             conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
             conn.onclose = function (evt) {
-                // var item = document.createElement("div");
-                // item.innerHTML = "<b>Connection closed.</b>";
-                // appendLog(item);
                 alert("Host closed connection!")
             };
             conn.onmessage = function (evt) {
@@ -46,47 +43,43 @@
         node: document.getElementById('ElmFight')
     });
 
-    // Handle new game attempts
-    app.ports.requestNewGame.subscribe(function(gameID) {
-        const request = new Request(document.location.host + '/newGameIDValid?gameID='+gameID);
+    function requestStatus(gameID, cb) {
+        const request = new Request(document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {
                     data = response.json()
-                    if (data['newGameIDValid']) {
-                        app.ports.receiveNewGame.send(data['gameID'])
-                        subToGame(data['gameID'])
-                    }
-                    else {
-                        alert("Can't start new game with ID = " + gameID ". ID already in use." )
-                    }
+                    cb(data)
                 } else {
                     throw new Error('Something went wrong on api server!');
                 }
             }).catch(error => {
                 console.error(error);
-            });
+            });   
+    }
+    // Handle new game attempts
+    app.ports.requestNewGame.subscribe(function(gameID) {
+        requestStatus(gameID, (data) => {
+            if (data['newGameIDValid']) {
+                app.ports.receiveNewGame.send(data['gameID'])
+                subToGame(data['gameID'])
+            }
+            else {
+                alert("Can't start new game with ID = " + gameID ". ID already in use." )
+            }
+        })
     })
 
     // Handle join game attempts
-    app.ports.requestJoinGame.subscribe(function(gameID) {
-        const request = new Request(document.location.host + '/joinGameIDValid?gameID='+gameID);
-        fetch(request)
-            .then(response => {
-                if (response.status === 200) {
-                    data = response.json()
-                    if (data['joinGameIDValid']) {
-                        subToGame(data['gameID'])
-                    }
-                    else {
-                        alert("Can't join game with ID = " + gameID ". No matching game ID" )
-                    }
-                } else {
-                    throw new Error('Something went wrong on api server!');
-                }
-            }).catch(error => {
-                console.error(error);
-            });
+    app.ports.requestNewGame.subscribe(function(gameID) {
+        requestStatus(gameID, (data) => {
+            if (data['joinGameIDValid']) {
+                subToGame(data['gameID'])
+            }
+            else {
+                alert("Can't join game with ID = " + gameID ". No matching game ID" )
+            }
+        })
     })
 
     // send out board updates

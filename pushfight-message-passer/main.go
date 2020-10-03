@@ -28,14 +28,6 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 func serveJS(w http.ResponseWriter, r *http.Request) {
     log.Println(r.URL)
-    // if r.URL.Path != "/" {
-    //  http.Error(w, "Not found", http.StatusNotFound)
-    //  return
-    // }
-    // if r.Method != "GET" {
-    //  http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-    //  return
-    // }
     http.ServeFile(w, r, "./elm.js")
 }
 
@@ -63,8 +55,7 @@ func main() {
 
     http.HandleFunc("/", serveHome)
     http.HandleFunc("/elm.js", serveJS)
-    http.HandleFunc("/joinGameIDValid", handleGameID)
-    http.HandleFunc("/newGameIDValid", handleGameID)
+    http.HandleFunc("/gameIDStatus", handleGameID)
     http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
         

@@ -8,6 +8,7 @@ import (
     "flag"
     "log"
     "net/http"
+    // "github.com/gorilla/websocket/mux"
     "fmt"
 )
 
@@ -38,17 +39,36 @@ func serveJS(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./elm.js")
 }
 
-
 func main() {
     hubs := make(map[string]*Hub)
+    handleGameID := func(w http.ResponseWriter, r *http.Request) {
+        gameIDs, ok := r.URL.Query()["gameID"]
+        if !ok || len(gameIDs) != 1 {
+            http.Error(w, "No game ID specified", http.StatusInternalServerError)
+            return
+        }
+        _, exists := hubs[gameIDs[0]]
+        jsonBody := func() string {
+            if exists {
+                return fmt.Sprintf(`"joinGameIDValid": true, "newGameIDValid": false`)
+            } else {
+                return fmt.Sprintf(`"joinGameIDValid": false, "newGameIDValid": true`)
+            }
+        }()
+
+        fmt.Fprintf(w, `{ "gameID": "%s", %s}`, gameIDs[0], jsonBody)
+    }
 
     flag.Parse()
+
     http.HandleFunc("/", serveHome)
     http.HandleFunc("/elm.js", serveJS)
+    http.HandleFunc("/joinGameIDValid", handleGameID)
+    http.HandleFunc("/newGameIDValid", handleGameID)
     http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
         
-        if !ok || len(gameIDs[0]) < 1 {
+        if !ok || len(gameIDs) < 1 {
             log.Println("Url Param 'gameID' is missing")
             return
         }

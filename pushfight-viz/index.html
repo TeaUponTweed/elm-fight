@@ -14,11 +14,38 @@
 </body>
 
 <script type="text/javascript">
-    // Start the Elm application.
+    // helpers for establishing websocket connection
     var conn;
+    function closeConn() {
+        if (!conn) {
+            return;
+        }
+        conn.close();
+        conn = null;
+    }
+    function subToGame(gameID) {
+        if (window["WebSocket"]) {
+            closeConn();
+            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
+            conn.onclose = function (evt) {
+                // var item = document.createElement("div");
+                // item.innerHTML = "<b>Connection closed.</b>";
+                // appendLog(item);
+                alert("Host closed connection!")
+            };
+            conn.onmessage = function (evt) {
+                app.ports.receivePushfight.send(JSON.parse(evt.data));
+            };
+        } else {
+            alert("Your browser does not support WebSockets.")
+        }
+    }
+
+    // Start the Elm application.
     var app = Elm.Main.init({
         node: document.getElementById('ElmFight')
     });
+
     // Handle new game attempts
     app.ports.requestNewGame.subscribe(function(gameID) {
         const request = new Request(document.location.host + '/newGameIDValid?gameID='+gameID);
@@ -28,6 +55,7 @@
                     data = response.json()
                     if (data['newGameIDValid']) {
                         app.ports.receiveNewGame.send(data['gameID'])
+                        subToGame(data['gameID'])
                     }
                     else {
                         alert("Can't start new game with ID = " + gameID ". ID already in use." )
@@ -39,6 +67,7 @@
                 console.error(error);
             });
     })
+
     // Handle join game attempts
     app.ports.requestJoinGame.subscribe(function(gameID) {
         const request = new Request(document.location.host + '/joinGameIDValid?gameID='+gameID);
@@ -47,20 +76,7 @@
                 if (response.status === 200) {
                     data = response.json()
                     if (data['joinGameIDValid']) {
-                        if (window["WebSocket"]) {
-                            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + data['gameID']);
-                            conn.onclose = function (evt) {
-                                // var item = document.createElement("div");
-                                // item.innerHTML = "<b>Connection closed.</b>";
-                                // appendLog(item);
-                                alert("Host closed connection!")
-                            };
-                            conn.onmessage = function (evt) {
-                                app.ports.receivePushfight.send(JSON.parse(evt.data));
-                            };
-                        } else {
-                            alert("Your browser does not support WebSockets.")
-                        }
+                        subToGame(data['gameID'])
                     }
                     else {
                         alert("Can't join game with ID = " + gameID ". No matching game ID" )
@@ -83,11 +99,7 @@
 
     // close WS connection when exitting game
     app.ports.notifyExit.subscribe(function () {
-        if (!conn) {
-            return;
-        }
-        conn.close();
-        conn = null;
+        closeConn();
     })
 
 </script>

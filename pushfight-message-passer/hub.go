@@ -18,6 +18,8 @@ type Hub struct {
 
 	// Unregister requests from clients.
 	unregister chan *Client
+
+	lastMsg []byte
 }
 
 func newHub() *Hub {
@@ -26,6 +28,7 @@ func newHub() *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]bool),
+		lastMsg: nil,
 	}
 }
 
@@ -34,6 +37,9 @@ func (h *Hub) run() {
 		select {
 		case client := <-h.register:
 			h.clients[client] = true
+			if h.lastMsg != nil {
+				client.send <- h.lastMsg
+			}
 		case client := <-h.unregister:
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
@@ -43,6 +49,7 @@ func (h *Hub) run() {
 			for client := range h.clients {
 				select {
 				case client.send <- message:
+					h.lastMsg = message
 				default:
 					close(client.send)
 					delete(h.clients, client)

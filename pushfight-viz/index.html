@@ -1,19 +1,95 @@
 <!DOCTYPE html>
 <html>
-  <head>
+
+<head>
     <link rel="stylesheet" 
           href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <meta charset="UTF-8">
+    <title>ElmFight</title>
+    <script type="text/javascript" src="ELM_SOURCE_FILE"></script>
+</head>
 
-  </head>
+<body>
+    <div id="ElmFight"></div>
+</body>
 
-  <body>
-    <div id="pushfight"></div>
-    
-    <script src="ELM_SOURCE_FILE"></script>
-    <script>
-      var app = Elm.Main.init({
-        node: document.getElementById("pushfight")
-      });      
-    </script>
-  </body>
+<script type="text/javascript">
+    // Start the Elm application.
+    var conn;
+    var app = Elm.Main.init({
+        node: document.getElementById('ElmFight')
+    });
+    // Handle new game attempts
+    app.ports.requestNewGame.subscribe(function(gameID) {
+        const request = new Request(document.location.host + '/newGameIDValid?gameID='+gameID);
+        fetch(request)
+            .then(response => {
+                if (response.status === 200) {
+                    data = response.json()
+                    if (data['newGameIDValid']) {
+                        app.ports.receiveNewGame.send(data['gameID'])
+                    }
+                    else {
+                        alert("Can't start new game with ID = " + gameID ". ID already in use." )
+                    }
+                } else {
+                    throw new Error('Something went wrong on api server!');
+                }
+            }).catch(error => {
+                console.error(error);
+            });
+    })
+    // Handle join game attempts
+    app.ports.requestJoinGame.subscribe(function(gameID) {
+        const request = new Request(document.location.host + '/joinGameIDValid?gameID='+gameID);
+        fetch(request)
+            .then(response => {
+                if (response.status === 200) {
+                    data = response.json()
+                    if (data['joinGameIDValid']) {
+                        if (window["WebSocket"]) {
+                            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + data['gameID']);
+                            conn.onclose = function (evt) {
+                                // var item = document.createElement("div");
+                                // item.innerHTML = "<b>Connection closed.</b>";
+                                // appendLog(item);
+                                alert("Host closed connection!")
+                            };
+                            conn.onmessage = function (evt) {
+                                app.ports.receivePushfight.send(JSON.parse(evt.data));
+                            };
+                        } else {
+                            alert("Your browser does not support WebSockets.")
+                        }
+                    }
+                    else {
+                        alert("Can't join game with ID = " + gameID ". No matching game ID" )
+                    }
+                } else {
+                    throw new Error('Something went wrong on api server!');
+                }
+            }).catch(error => {
+                console.error(error);
+            });
+    })
+
+    // send out board updates
+    app.ports.sendPushfight.subscribe(function(data) {
+        if (!conn) {
+            return;
+        }
+        conn.send(data.stringify());
+    })
+
+    // close WS connection when exitting game
+    app.ports.notifyExit.subscribe(function () {
+        if (!conn) {
+            return;
+        }
+        conn.close();
+        conn = null;
+    })
+
+</script>
+
 </html>

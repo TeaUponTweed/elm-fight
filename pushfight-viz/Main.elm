@@ -8,61 +8,62 @@ import Html.Events exposing (onClick, onInput)
 
 import Pushfight
 
---port requestNewGame : String -> Cmd msg
---port receiveNewGame : (String -> msg) -> Sub msg
+port requestNewGame : String -> Cmd msg
+port receiveNewGame : (String -> msg) -> Sub msg
 
---port requestJoinGame : String -> Cmd msg
+port requestJoinGame : String -> Cmd msg
 --port receiveJoinGame : (String -> msg) -> Sub msg
 
---port sendPushfight : Pushfight.Model -> Cmd msg
---port getPushfight : (Pushfight.Model -> msg) -> Sub msg
+port sendPushfight : Pushfight.Model -> Cmd msg
+port receivePushfight : (Pushfight.Model -> msg) -> Sub msg
 
---port notifyExit : () -> Cmd msg
+port notifyExit : () -> Cmd msg
 
 
---type alias Game =
---    { gameID: String
---    , pushfight: Pushfight.Model
---    }
+type alias Game =
+    { gameID: String
+    , pushfight: Pushfight.Model
+    }
 
 type Msg
-    = NewGame  
-    | JoinGame
+    = TryNewGame  
+    | TryJoinGame
     | UpdateNewGameID String
     | UpdateJoinGameID String
+    | PushfightFromServer Game
     | ExitGame
     | PushfightMsg Pushfight.Msg
 
 type alias Model =
-    { pushfight: Maybe Pushfight.Model
+    { game: Maybe Game
     , newGameID: String
     , joinGameID: String
     }
 
 view : Model -> Html Msg
 view model =
-    case model.pushfight of
-        Just pushfight ->
+    case model.game of
+        Just game ->
             div []
-                [ div [] [ Pushfight.view pushfight |> Html.map PushfightMsg ]
+                [ div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
                 , div [] [ button [ onClick ExitGame ] [ text "Leave Game" ] ]
                 ]
         Nothing ->
           div []
             [ div []
                 [ input [ placeholder "New Game ID", value model.newGameID, onInput UpdateNewGameID ] []
-                , button [ onClick NewGame ] [ text "Start New Game" ]
+                , button [ onClick TryNewGame ] [ text "Start New Game" ]
                 ]
             , div []
                 [ input [ placeholder "Join Game ID", value model.joinGameID, onInput UpdateJoinGameID ] []
-                , button [ onClick JoinGame ] [ text "Join Game" ]
+                , button [ onClick TryJoinGame ] [ text "Join Game" ]
                 ]
             ]
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { pushfight = Nothing , newGameID = "", joinGameID = ""}
+    ( { game = Nothing , newGameID = "", joinGameID = ""}
     , Cmd.none
     )
 
@@ -72,21 +73,34 @@ update msg model =
         noop = ( model, Cmd.none)
     in
         case msg of
-            NewGame ->
+            TryNewGame ->
                 if String.length model.newGameID > 0 then
-                    let
-                        (pushfight, cmdMsg) = Pushfight.init ()
-                    in
-                        ( { model | pushfight = Just pushfight}
-                        , Cmd.map PushfightMsg cmdMsg
-                        )
+                    ( model
+                    , requestNewGame model.newGameID
+                    )
                 else
                     noop
-            JoinGame ->
-                noop
+            StartNewGame gameID ->
+                    let
+                        (pushfight, cmdMsg) = Pushfight.init ()
+                        game = { gameID = gameID, pushfight = pushfight}
+                    in
+                        ( { model | pushfight = Just pushfight}
+                        , Cmd.batch
+                            [ Cmd.map PushfightMsg cmdMsg
+                            , sendPushfight pushfight
+                            ]
+                        )
+            TryJoinGame ->
+                if String.length model.joinGameID > 0 then
+                    ( model
+                    , requestJoinGame model.joinGameID
+                    )
+                else
+                    noop
             ExitGame ->
-                ( { model | pushfight = Nothing }
-                , Cmd.none
+                ( { model | game = Nothing }
+                , notifyExit
                 )
             UpdateNewGameID gameID ->
                 ( { model | newGameID = gameID }
@@ -97,22 +111,27 @@ update msg model =
                 , Cmd.none
                 )
             PushfightMsg pfmsg ->
-                case model.pushfight of
-                    Just pushfight ->
+                case model.game of
+                    Just game ->
                         let
-                            (updatedPushfight, cmdMsg) = Pushfight.update pfmsg pushfight
+                            (pushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
                         in
-                            ( { model | pushfight = Just updatedPushfight}
+                            ( { model | pushfight = Just pushfight}
                             , Cmd.map PushfightMsg cmdMsg
                             )
                     Nothing ->
                         noop
+            PushfightFromServer game ->
+                ( { model | game = Just game }
+                , Cmd.none
+                )
+
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.pushfight of
-        Just pushfight ->
-            Pushfight.subscriptions pushfight |> Sub.map PushfightMsg
+    case model.game of
+        Just game ->
+            Pushfight.subscriptions game.pushfight |> Sub.map PushfightMsg
         Nothing ->
             Sub.batch []
 
@@ -123,5 +142,3 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
-

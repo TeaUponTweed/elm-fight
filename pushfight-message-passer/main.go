@@ -38,28 +38,13 @@ func serveJS(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./elm.js")
 }
 
-func newGame(w http.ResponseWriter, r *http.Request) {
-    log.Println(r.URL)
-    if r.URL.Path != "/ng" {
-        http.Error(w, "Not found", http.StatusNotFound)
-        return
-    }
-    if r.Method != "GET" {
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    fmt.Println("hello world")
-}
 
 func main() {
     hubs := make(map[string]*Hub)
 
     flag.Parse()
-    // hub := 
-    // go hub.run()
     http.HandleFunc("/", serveHome)
     http.HandleFunc("/elm.js", serveJS)
-    // http.HandleFunc("/ng", newGame)
     http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
         
@@ -69,12 +54,16 @@ func main() {
         }
         for i := 0; i < len(gameIDs); i++ {
             hub, exists := hubs[gameIDs[i]]
+            fmt.Println("gameID =", gameIDs[i])
+
             if !exists {
                 hub := newHub()
                 go hub.run()
                 hubs[gameIDs[i]] = hub
+                serveWs(hub, w, r)
+            } else {
+                serveWs(hub, w, r)
             }
-            serveWs(hub, w, r)
         }
     })
     err := http.ListenAndServe(*addr, nil)

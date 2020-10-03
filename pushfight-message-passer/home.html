@@ -6,6 +6,7 @@
 window.onload = function () {
     var conn;
     var msg = document.getElementById("msg");
+    var gameID = document.getElementById("gameID");
     var log = document.getElementById("log");
 
     function appendLog(item) {
@@ -29,26 +30,41 @@ window.onload = function () {
         return false;
     };
 
-    if (window["WebSocket"]) {
-        conn = new WebSocket("ws://" + document.location.host + "/ws");
-        conn.onclose = function (evt) {
-            var item = document.createElement("div");
-            item.innerHTML = "<b>Connection closed.</b>";
-            appendLog(item);
-        };
-        conn.onmessage = function (evt) {
-            var messages = evt.data.split('\n');
-            for (var i = 0; i < messages.length; i++) {
+    document.getElementById("chatJoin").onsubmit = function () {
+        // if (!conn) {
+        //     return false;
+        // }
+        console.log("ere")
+        if (!gameID.value) {
+            return false;
+        }
+        console.log(gameID.value);
+        if (window["WebSocket"]) {
+            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID.value);
+            conn.onclose = function (evt) {
                 var item = document.createElement("div");
-                item.innerText = messages[i];
+                item.innerHTML = "<b>Connection closed.</b>";
                 appendLog(item);
-            }
-        };
-    } else {
-        var item = document.createElement("div");
-        item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
-        appendLog(item);
-    }
+            };
+            conn.onmessage = function (evt) {
+                var messages = evt.data.split('\n');
+                for (var i = 0; i < messages.length; i++) {
+                    var item = document.createElement("div");
+                    item.innerText = messages[i];
+                    appendLog(item);
+                }
+            };
+        } else {
+            var item = document.createElement("div");
+            item.innerHTML = "<b>Your browser does not support WebSockets.</b>";
+            appendLog(item);
+        }
+        var chatJoin = document.getElementById("chatJoin");
+        chatJoin.style.display = "none";
+        return false;
+    };
+
+
 };
 </script>
 <style type="text/css">
@@ -70,7 +86,7 @@ body {
     margin: 0;
     padding: 0.5em 0.5em 0.5em 0.5em;
     position: absolute;
-    top: 0.5em;
+    top: 2.5em;
     left: 0.5em;
     right: 0.5em;
     bottom: 3em;
@@ -86,7 +102,15 @@ body {
     width: 100%;
     overflow: hidden;
 }
-
+#chatJoin {
+    padding: 0 0.5em 0 0.5em;
+    margin: 0;
+    position: absolute;
+    top: 0.5em;
+    left: 0px;
+    width: 100%;
+    overflow: hidden;
+}
 </style>
 </head>
 <body>
@@ -94,6 +118,10 @@ body {
 <form id="form">
     <input type="submit" value="Send" />
     <input type="text" id="msg" size="64" autofocus />
+</form>
+<form id="chatJoin">
+    <input type="submit" value="Join Chat" />
+    <input type="text" id="gameID" size="64" autofocus />
 </form>
 </body>
 </html>

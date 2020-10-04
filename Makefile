@@ -23,11 +23,13 @@ target/pushfight-message-passer: pushfight-message-passer/*.go
 	mv ./pushfight-message-passer/pushfight-message-passer ./target
 
 
-target/pushfight-message-passer_linux target/elm.min.js: target/elm.js target/pushfight-message-passer
+target/elm.min.js: target/elm.js
 	elm make ./pushfight-viz/Main.elm --optimize --output=./target/elm.optimized.js
 	uglifyjs ./target/elm.optimized.js \
 		--compress "pure_funcs=[F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9],pure_getters,keep_fargs=false,unsafe_comps,unsafe" \
 		| uglifyjs --mangle --output=./target/elm.min.js
+
+target/pushfight-message-passer_linux: target/pushfight-message-passer
 	cd ./pushfight-message-passer/ && GOOS=linux GOARCH=amd64 go build .
 	mv ./pushfight-message-passer/pushfight-message-passer ./target/pushfight-message-passer_linux
 

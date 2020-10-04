@@ -1,6 +1,7 @@
 // Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
+// 2020 Code modified by Michael Mason from https://github.com/gorilla/websocket/tree/master/examples/chat
 
 package main
 

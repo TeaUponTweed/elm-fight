@@ -6,7 +6,7 @@
           href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
     <meta charset="UTF-8">
     <title>ElmFight</title>
-    <script type="text/javascript" src="ELM_SOURCE_FILE"></script>
+    <script type="text/javascript" src="elm.js"></script>
 </head>
 
 <body>
@@ -14,6 +14,11 @@
 </body>
 
 <script type="text/javascript">
+    // Start the Elm application.
+    var app = Elm.Main.init({
+        node: document.getElementById('ElmFight')
+    });
+
     // helpers for establishing websocket connection
     var conn;
     function closeConn() {
@@ -23,12 +28,14 @@
         conn.close();
         conn = null;
     }
-    function subToGame(gameID) {
+    function subToGame(gameID, openCB) {
         if (window["WebSocket"]) {
             closeConn();
             conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
             conn.onclose = function (evt) {
-                alert("Host closed connection!")
+                console.log("Host closed connection!")
+                app.ports.receiveConnectionLost.send("Host closed connection.")
+                conn = null
             };
             conn.onmessage = function (evt) {
                 app.ports.receivePushfight.send(JSON.parse(evt.data));
@@ -38,10 +45,7 @@
         }
     }
 
-    // Start the Elm application.
-    var app = Elm.Main.init({
-        node: document.getElementById('ElmFight')
-    });
+
 
     function requestStatus(gameID, cb) {
         const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
@@ -59,14 +63,16 @@
                 console.error(error);
             });   
     }
-    console.log(app.ports)
+    // console.log(app.ports)
     // Handle new game attempts
     app.ports.requestNewGame.subscribe(function(gameID) {
         requestStatus(gameID, (data) => {
-            console.log(data)
+            console.log("requestNewGame")
             if (data['newGameIDValid']) {
-                app.ports.receiveNewGame.send(data['gameID'])
                 subToGame(data['gameID'])
+                conn.onopen = function () {
+                    app.ports.receiveNewGame.send(data['gameID'])
+                }
             }
             else {
                 alert("Can't start new game with ID = " + gameID + ". ID already in use." )
@@ -76,6 +82,7 @@
 
     // Handle join game attempts
     app.ports.requestJoinGame.subscribe(function(gameID) {
+        console.log("requestJoinGame")
         requestStatus(gameID, (data) => {
             if (data['joinGameIDValid']) {
                 subToGame(data['gameID'])
@@ -88,16 +95,19 @@
 
     // send out board updates
     app.ports.sendPushfight.subscribe(function(data) {
+        console.log("sendPushfight")
         if (!conn) {
             return;
         }
+        console.log("outgoing board")
         console.log(data)
         conn.send(JSON.stringify(data));
     })
 
     // close WS connection when exitting game
     app.ports.notifyExit.subscribe(function () {
-        closeConn();
+        console.log("notifyExit")
+        closeConn(false);
     })
 
 </script>

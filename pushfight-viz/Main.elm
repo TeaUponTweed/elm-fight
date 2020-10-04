@@ -1,7 +1,7 @@
 port module Main exposing (Msg,Model,init,update,view)
 
 import Browser
-import Debug
+--import Debug
 import Json.Decode as D
 import Json.Encode as E
 import Html exposing (Html, button, div, text, input)
@@ -15,7 +15,8 @@ port requestNewGame : String -> Cmd msg
 port receiveNewGame : (String -> msg) -> Sub msg
 
 port requestJoinGame : String -> Cmd msg
---port receiveJoinGame : (String -> msg) -> Sub msg
+
+port receiveConnectionLost : (String -> msg) -> Sub msg
 
 port sendPushfight : E.Value -> Cmd msg
 port receivePushfight : (D.Value -> msg) -> Sub msg
@@ -31,6 +32,7 @@ type alias Game =
 type Msg
     = TryNewGame  
     | TryJoinGame
+    | ConnectionLost String
     | StartNewGame String
     | UpdateNewGameID String
     | UpdateJoinGameID String
@@ -50,7 +52,8 @@ view model =
     case model.game of
         Just game ->
             div []
-                [ div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
+                [ div [] [ "Game ID = " ++ game.gameID |> text]
+                , div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
                 , div [] [ button [ onClick ExitGame ] [ text "Leave Game" ] ]
                 ]
         Nothing ->
@@ -102,9 +105,13 @@ update msg model =
                         )
             TryJoinGame ->
                 if String.length model.joinGameID > 0 then
-                    ( model
-                    , requestJoinGame model.joinGameID
-                    )
+                    case model.game of
+                        Just _ ->
+                            noop
+                        Nothing ->
+                            ( model
+                            , requestJoinGame model.joinGameID
+                            )
                 else
                     noop
             ExitGame ->
@@ -117,6 +124,10 @@ update msg model =
                 )
             UpdateJoinGameID gameID ->
                 ( { model | joinGameID = gameID }
+                , Cmd.none
+                )
+            ConnectionLost _ ->
+                ( { model | game = Nothing}
                 , Cmd.none
                 )
             PushfightMsg pfmsg ->
@@ -169,7 +180,8 @@ mapPushFightDecode windowWidth gridSize endTurnOnPush json =
             , gameID = pushfight.gameID
             }
         Err e ->
-            Debug.log "Failed to parse board" NoOp
+            NoOp
+            --Debug.log "Failed to parse board" NoOp
 
 mapNewGameDecode: D.Value -> Msg
 mapNewGameDecode json =
@@ -177,7 +189,8 @@ mapNewGameDecode json =
         Ok gameID ->
             StartNewGame gameID
         Err e ->
-            Debug.log "Failed to parse new game ID" NoOp
+            NoOp
+            --Debug.log "Failed to parse new game ID" NoOp
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -199,6 +212,7 @@ subscriptions model =
         [ msgs
         , receivePushfight (mapPushFightDecode windowWidth gridSize endTurnOnPush)
         , receiveNewGame StartNewGame
+        , receiveConnectionLost ConnectionLost
         ]
 main =
     Browser.element

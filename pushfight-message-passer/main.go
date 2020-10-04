@@ -12,7 +12,7 @@ import (
     "fmt"
 )
 
-var addr = flag.String("addr", ":8080", "http service address")
+var addr = flag.String("addr", ":80", "http service address")
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
     log.Println(r.URL)
@@ -31,6 +31,10 @@ func serveJS(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "./elm.js")
 }
 
+func serveDNSValid(w http.ResponseWriter, r *http.Request) {
+    log.Println(r.URL)
+    http.ServeFile(w, r, "./B0BF35BDC0BC60AD9175C9CEA6E49315.txt")
+}
 func main() {
     hubs := make(map[string]*Hub)
     handleGameID := func(w http.ResponseWriter, r *http.Request) {
@@ -54,6 +58,7 @@ func main() {
     flag.Parse()
 
     http.HandleFunc("/", serveHome)
+    http.HandleFunc("/.well-known/pki-validation/B0BF35BDC0BC60AD9175C9CEA6E49315.txt", serveDNSValid)
     http.HandleFunc("/elm.js", serveJS)
     http.HandleFunc("/gameIDStatus", handleGameID)
     http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

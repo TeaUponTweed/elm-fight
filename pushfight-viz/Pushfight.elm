@@ -1,4 +1,4 @@
-module Pushfight exposing (init, update, view, Msg, Model, subscriptions, grabWindowWidth)
+module Pushfight exposing (init, update, view, Msg, Model, subscriptions, grabWindowWidth, checkForGameOver)
 
 --import Debug
 
@@ -301,6 +301,7 @@ update msg model =
                 --anchor =
                     --getAnchor model
                 nextTurn = Turn [] Nothing board
+                noop = ( model, Cmd.none)
                     --case anchor of
                     --Just anchor ->
                     --    Turn [] Nothing board
@@ -323,7 +324,7 @@ update msg model =
                                 , Cmd.none
                                 )
                             Nothing ->
-                                ( model, Cmd.none)
+                                noop
                     BlackTurn ->
                         case model.currentTurn.push of
                             Just push ->
@@ -331,15 +332,11 @@ update msg model =
                                 , Cmd.none
                                 )
                             Nothing ->
-                                ( model, Cmd.none)
+                                noop
                     WhiteWon ->
-                        ( model
-                        , Cmd.none
-                        )
+                        noop
                     BlackWon ->
-                        ( model
-                        , Cmd.none
-                        )
+                        noop
         Undo ->
             case model.currentTurn.push of
                 Just push ->
@@ -518,9 +515,8 @@ maybeGet func maybe =
         Nothing ->
             Nothing
 
-
-turnTransition : Board -> GameStage -> GameStage
-turnTransition board gameStage =
+checkForGameOver : Board -> Maybe GameStage
+checkForGameOver board =
     let
         offBoardPiece =
             board
@@ -531,14 +527,22 @@ turnTransition board gameStage =
     in
         case maybeGet .color offBoardPiece of
             Just White ->
-                BlackWon
+                Just BlackWon
             Just Black ->
-                WhiteWon
+                Just WhiteWon
             Nothing ->
-                case gameStage of
-                    BlackTurn ->
-                        WhiteTurn
-                    WhiteTurn ->
-                        BlackTurn
-                    _ ->
-                        gameStage
+                Nothing
+
+turnTransition : Board -> GameStage -> GameStage
+turnTransition board gameStage =
+    case checkForGameOver board of
+        Just gameOver ->
+            gameOver
+        Nothing ->
+            case gameStage of
+                BlackTurn ->
+                    WhiteTurn
+                WhiteTurn ->
+                    BlackTurn
+                _ ->
+                    gameStage

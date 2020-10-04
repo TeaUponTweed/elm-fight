@@ -72,6 +72,10 @@ init _ =
     , Cmd.none
     )
 
+boardChange: Pushfight.Model -> Pushfight.Model -> Bool
+boardChange m1 m2 =
+    (m1.currentTurn /= m2.currentTurn) || (m1.gameStage /= m2.gameStage)
+
 update: Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -119,23 +123,29 @@ update msg model =
                 case model.game of
                     Just game ->
                         let
-                            (pushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
+                            (updatedPushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
                             sndUpdateCmdMsg =
-                                if pushfight /= game.pushfight then
-                                    [encodePushfight game.gameID pushfight |> sendPushfight]
+                                if boardChange updatedPushfight game.pushfight then --pushfight /= game.pushfight then
+                                    [encodePushfight game.gameID updatedPushfight |> sendPushfight]
                                 else
                                     []
 
                         in
-                            ( { model | game = Just { pushfight = pushfight, gameID = game.gameID } }
+                            ( { model | game = Just { pushfight = updatedPushfight, gameID = game.gameID } }
                             , [Cmd.map PushfightMsg cmdMsg] ++ sndUpdateCmdMsg |> Cmd.batch
                             )
                     Nothing ->
                         noop
             PushfightFromServer game ->
-                ( { model | game = Just game}
-                , Pushfight.grabWindowWidth () |> Cmd.map PushfightMsg
-                )
+                case model.game of
+                    Just _ ->
+                        ( { model | game = Just game}
+                        , Cmd.none
+                        )
+                    Nothing ->
+                        ( { model | game = Just game}
+                        , Pushfight.grabWindowWidth () |> Cmd.map PushfightMsg
+                        )
                 --case decodePushfight codedPushfight of
                 --    Ok (gameID, pushfight) ->
                 --        ( { model | game = Just {gameID = gameID, pushfight = pushfight} }
@@ -161,6 +171,14 @@ mapPushFightDecode windowWidth gridSize endTurnOnPush json =
         Err e ->
             Debug.log "Failed to parse board" NoOp
 
+mapNewGameDecode: D.Value -> Msg
+mapNewGameDecode json =
+    case D.decodeValue D.string json of
+        Ok gameID ->
+            StartNewGame gameID
+        Err e ->
+            Debug.log "Failed to parse new game ID" NoOp
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     let
@@ -179,8 +197,8 @@ subscriptions model =
     in
         Sub.batch
         [ msgs
-        , receivePushfight (mapPushFightDecode 1000 100 False)
-        --, receiveNewGame |> Sub.map StartNewGame
+        , receivePushfight (mapPushFightDecode windowWidth gridSize endTurnOnPush)
+        , receiveNewGame StartNewGame
         ]
 main =
     Browser.element

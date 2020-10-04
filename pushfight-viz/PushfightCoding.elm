@@ -9,7 +9,7 @@ import Json.Encode as Encode
 
 
 import PFTypes exposing (..)
-import Pushfight exposing (Model)
+import Pushfight exposing (Model, checkForGameOver)
 
 type alias CodedMove =
     { from_x: Int
@@ -121,22 +121,20 @@ encodePushfight gameID model =
                 , to_x = to_x
                 , to_y = to_y
                 }
-        pushes =
-            case model.currentTurn.push of
-                Just push ->
-                    [push]
-                Nothing ->
-                    [] 
-        codedMoves =
-            model.currentTurn.moves ++ pushes
-            |> List.map moveToCodedMove                
+        --pushes =
+        --    case model.currentTurn.push of
+        --        Just push ->
+        --            [push]
+        --        Nothing ->
+        --            [] 
+        codedMoves = model.currentTurn.moves |> List.map moveToCodedMove
 
 
 
     in
         case ((wps, bps), (wms, bms)) of
             (([wp1, wp2, wp3], [bp1, bp2, bp3]), ([wm1, wm2], [bm1, bm2])) ->
-                Encode.object
+                Encode.object (
                     [ ("wp1", wp1 |> keyToIx |> Encode.int)
                     , ("wp2", wp2 |> keyToIx |> Encode.int)
                     , ("wp3", wp3 |> keyToIx |> Encode.int)
@@ -152,7 +150,12 @@ encodePushfight gameID model =
                     , ("wasWhitesTurn", Encode.bool wasWhitesTurn)
                     , ("moves", Encode.list encodeMove codedMoves)
                     , ("gameID", Encode.string gameID)
-                    ]
+                    ] ++ case model.currentTurn.push of
+                        Just push ->
+                            [("push", moveToCodedMove push |> encodeMove)]
+                        Nothing ->
+                            [("push", Encode.null)]
+                    )
             _ ->
                 Encode.null
 
@@ -173,6 +176,7 @@ type alias DecodedBoard =
     , wasSetup : Bool
     , wasWhitesTurn : Bool
     , moves: List CodedMove
+    , push: Maybe CodedMove
     , gameID : String
     }
 
@@ -197,18 +201,33 @@ pushfightDecoderImpl =
         |> DecodePipeline.required "bp3" Decode.int
         |> DecodePipeline.required "bm1" Decode.int
         |> DecodePipeline.required "bm2" Decode.int
-        |> DecodePipeline.required "anchor" Decode.int
+        |> DecodePipeline.required "anc" Decode.int
         |> DecodePipeline.required "wasSetup" Decode.bool
         |> DecodePipeline.required "wasWhitesTurn" Decode.bool
         |> DecodePipeline.required "moves" (Decode.list moveDecoder)
+        |> DecodePipeline.required "push" (Decode.nullable moveDecoder)
         |> DecodePipeline.required "gameID" Decode.string
+
+splitLast: List a -> (List a, Maybe a)
+splitLast l =
+    --let
+    --    r = 
+    --    --h, t = List.tail r
+    --in
+    case List.reverse l of
+        [] ->
+            ([], Nothing)
+        [x] ->
+            ([], Just x)
+        x :: xs ->
+            (List.reverse xs, Just x)
 
 decodePushfight : Int -> Int -> Bool -> DecodedBoard -> Model
 decodePushfight windowWidth gridSize endTurnOnPush decoded =
     let
         ixToKey: Int -> PositionKey
         ixToKey ix =
-            (modBy ix 10, ix // 10)
+            (modBy 10 ix, ix // 10)
 
         pieces =
             [ (decoded.wp1 |> ixToKey, Piece Pusher White)
@@ -230,17 +249,7 @@ decodePushfight windowWidth gridSize endTurnOnPush decoded =
             , to = (to_x, to_y)
             }
 
-        (moves, push) =
-            case (List.map codedMoveToMove decoded.moves) of
-                [m] ->
-                    ([], Just m)
-                [m1, m2] ->
-                    ([m1], Just m2)
-                [m1, m2, m3] ->
-                    ([m1, m2], Just m3)
-                _ ->
-                    ([], Nothing)
-
+        --(moves, push) = (, Nothing)
         anchor =
             if decoded.anchor == 0 then
                 Nothing
@@ -249,19 +258,54 @@ decodePushfight windowWidth gridSize endTurnOnPush decoded =
                     (x,y) = ixToKey decoded.anchor
                 in
                     Just {x = x , y = y}
+        moves = List.map codedMoveToMove decoded.moves
+        push = Maybe.map codedMoveToMove decoded.push
+
+        --(moves, push) =
+        --    case List.map codedMoveToMove decoded.moves |> splitLast of
+        --        (someMoves, Just lastMove) ->
+        --            case anchor of
+        --                Just {x, y} ->
+        --                    let
+        --                        (tox, toy) = lastMove.to
+        --                    in
+        --                        if x == tox && y == toy then
+        --                            (someMoves, Just lastMove)
+        --                        else
+        --                            (someMoves ++ [lastMove], Nothing)
+        --                Nothing ->
+        --                    (someMoves ++ [lastMove], Nothing)
+        --        (someMoves, Nothing) ->
+        --            (someMoves, Nothing)
+
+        --    case (List.map codedMoveToMove decoded.moves) of
+        --        [m] ->
+        --            ([], Just m)
+        --        [m1, m2] ->
+        --            ([m1], Just m2)
+        --        [m1, m2, m3] ->
+        --            ([m1, m2], Just m3)
+        --        _ ->
+        --            ([], Nothing)
+
+
         board =
             Board pieces anchor
 
         gameStage =
-            case (decoded.wasSetup, decoded.wasWhitesTurn) of
-                (False, False) ->
-                    BlackTurn
-                (False, True) ->
-                    WhiteTurn
-                (True, False) ->
-                    BlackSetup
-                (True, True) ->
-                    WhiteSetup
+            case checkForGameOver board of
+                Just gameOver ->
+                    gameOver
+                Nothing ->
+                    case (decoded.wasSetup, decoded.wasWhitesTurn) of
+                        (False, False) ->
+                            BlackTurn
+                        (False, True) ->
+                            WhiteTurn
+                        (True, False) ->
+                            BlackSetup
+                        (True, True) ->
+                            WhiteSetup
 
 
         turn =

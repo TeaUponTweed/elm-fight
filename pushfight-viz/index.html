@@ -35,7 +35,6 @@
             conn.onclose = function (evt) {
                 console.log("Host closed connection!")
                 app.ports.receiveConnectionLost.send("Host closed connection.")
-                conn = null
             };
             conn.onmessage = function (evt) {
                 app.ports.receivePushfight.send(JSON.parse(evt.data));
@@ -107,7 +106,7 @@
     // close WS connection when exitting game
     app.ports.notifyExit.subscribe(function () {
         console.log("notifyExit")
-        closeConn(false);
+        closeConn();
     })
 
 </script>

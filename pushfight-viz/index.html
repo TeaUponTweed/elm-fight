@@ -44,12 +44,14 @@
     });
 
     function requestStatus(gameID, cb) {
-        const request = new Request(document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {
-                    data = response.json()
-                    cb(data)
+                    response.json()
+                        .then(data => {
+                            cb(data)                    
+                        })
                 } else {
                     throw new Error('Something went wrong on api server!');
                 }
@@ -57,27 +59,29 @@
                 console.error(error);
             });   
     }
+    console.log(app.ports)
     // Handle new game attempts
     app.ports.requestNewGame.subscribe(function(gameID) {
         requestStatus(gameID, (data) => {
+            console.log(data)
             if (data['newGameIDValid']) {
                 app.ports.receiveNewGame.send(data['gameID'])
                 subToGame(data['gameID'])
             }
             else {
-                alert("Can't start new game with ID = " + gameID ". ID already in use." )
+                alert("Can't start new game with ID = " + gameID + ". ID already in use." )
             }
         })
     })
 
     // Handle join game attempts
-    app.ports.requestNewGame.subscribe(function(gameID) {
+    app.ports.requestJoinGame.subscribe(function(gameID) {
         requestStatus(gameID, (data) => {
             if (data['joinGameIDValid']) {
                 subToGame(data['gameID'])
             }
             else {
-                alert("Can't join game with ID = " + gameID ". No matching game ID" )
+                alert("Can't join game with ID = " + gameID + ". No matching game ID" )
             }
         })
     })
@@ -87,7 +91,8 @@
         if (!conn) {
             return;
         }
-        conn.send(data.stringify());
+        console.log(data)
+        conn.send(JSON.stringify(data));
     })
 
     // close WS connection when exitting game

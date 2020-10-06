@@ -33,7 +33,6 @@ target/pushfight-message-passer_linux: target/pushfight-message-passer
 	cd ./pushfight-message-passer/ && GOOS=linux GOARCH=amd64 go build .
 	mv ./pushfight-message-passer/pushfight-message-passer ./target/pushfight-message-passer_linux
 
-upload: ./target/pushfight-message-passer_linux ./target/elm.min.js
+upload: ./target/pushfight-message-passer_linux ./target/elm.min.js ./target/index.html
 	cd target && rsync -au pushfight-message-passer_linux index.html nanode:webapp/
 	scp ./target/elm.min.js nanode:webapp/elm.js
-

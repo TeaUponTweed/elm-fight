@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <title>ElmFight</title>
     <script type="text/javascript" src="elm.js"></script>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 </head>
 
 <body>
@@ -47,7 +48,7 @@
 
 
     function requestStatus(gameID, cb) {
-        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('https://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {

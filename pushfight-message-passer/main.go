@@ -1,18 +1,22 @@
-// Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-// 2020 Code modified by Michael Mason from https://github.com/gorilla/websocket/tree/master/examples/chat
+// // Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
+// // Use of this source code is governed by a BSD-style
+// // license that can be found in the LICENSE file.
+// // 2020 Code modified by Michael Mason from https://github.com/gorilla/websocket/tree/master/examples/chat
 
 package main
 
 import (
+    "context"
+    "crypto/tls"
     "flag"
+    "fmt"
+    // "io"
     "log"
     "net/http"
-    "fmt"
-)
+    "time"
 
-var addr = flag.String("addr", ":80", "http service address")
+    "golang.org/x/crypto/acme/autocert"
+)
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
     log.Println(r.URL)
@@ -28,14 +32,62 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 func serveJS(w http.ResponseWriter, r *http.Request) {
     log.Println(r.URL)
+    if r.URL.Path != "/elm.js" {
+        http.Error(w, "Not found", http.StatusNotFound)
+        return
+    }
+    if r.Method != "GET" {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
     http.ServeFile(w, r, "./elm.js")
 }
 
-func serveDNSValid(w http.ResponseWriter, r *http.Request) {
-    log.Println(r.URL)
-    http.ServeFile(w, r, "./B0BF35BDC0BC60AD9175C9CEA6E49315.txt")
+var (
+    flgProduction          = true
+    flgRedirectHTTPToHTTPS = true
+)
+
+// func handleIndex(w http.ResponseWriter, r *http.Request) {
+//     io.WriteString(w, htmlIndex)
+// }
+
+func makeServerFromMux(mux *http.ServeMux) *http.Server {
+    // set timeouts so that a slow or malicious client doesn't
+    // hold resources forever
+    return &http.Server{
+        ReadTimeout:  5 * time.Second,
+        WriteTimeout: 5 * time.Second,
+        IdleTimeout:  120 * time.Second,
+        Handler:      mux,
+    }
 }
-func main() {
+
+// func makeHTTPServer() *http.Server {
+//     mux := &http.ServeMux{}
+//     mux.HandleFunc("/", handleIndex)
+//     return makeServerFromMux(mux)
+
+// }
+
+func makeHTTPToHTTPSRedirectServer() *http.Server {
+    handleRedirect := func(w http.ResponseWriter, r *http.Request) {
+        newURI := "https://" + r.Host + r.URL.String()
+        http.Redirect(w, r, newURI, http.StatusFound)
+    }
+    mux := &http.ServeMux{}
+    mux.HandleFunc("/", handleRedirect)
+    return makeServerFromMux(mux)
+}
+
+func parseFlags() {
+    flag.BoolVar(&flgProduction, "production", false, "if true, we start HTTPS server")
+    flag.BoolVar(&flgRedirectHTTPToHTTPS, "redirect-to-https", false, "if true, we redirect HTTP to HTTPS")
+    flag.Parse()
+}
+
+func makeHTTPServer() *http.Server {
+    mux := &http.ServeMux{}
     hubs := make(map[string]*Hub)
     handleGameID := func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
@@ -54,14 +106,11 @@ func main() {
 
         fmt.Fprintf(w, `{ "gameID": "%s", %s}`, gameIDs[0], jsonBody)
     }
-
-    flag.Parse()
-
-    http.HandleFunc("/", serveHome)
-    http.HandleFunc("/.well-known/pki-validation/B0BF35BDC0BC60AD9175C9CEA6E49315.txt", serveDNSValid)
-    http.HandleFunc("/elm.js", serveJS)
-    http.HandleFunc("/gameIDStatus", handleGameID)
-    http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+    mux.HandleFunc("/", serveHome)
+    // mux.HandleFunc("/.well-known/pki-validation/B0BF35BDC0BC60AD9175C9CEA6E49315.txt", serveDNSValid)
+    mux.HandleFunc("/elm.js", serveJS)
+    mux.HandleFunc("/gameIDStatus", handleGameID)
+    mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
         
         if !ok || len(gameIDs) < 1 {
@@ -82,8 +131,67 @@ func main() {
             }
         }
     })
-    err := http.ListenAndServe(*addr, nil)
+    return makeServerFromMux(mux)
+}
+
+func main() {
+    parseFlags()
+    var m *autocert.Manager
+
+    var httpsSrv *http.Server
+    var httpPort string
+    if flgProduction {
+        httpPort = "0.0.0.0:80"
+        hostPolicy := func(ctx context.Context, host string) error {
+            // Note: change to your real host
+            allowedHost := "www.masonuvagun.xyz"
+            fmt.Println(host)
+            if host == allowedHost {
+                return nil
+            }
+            return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+        }
+
+        dataDir := "."
+        m = &autocert.Manager{
+            Prompt:     autocert.AcceptTOS,
+            HostPolicy: hostPolicy,
+            Cache:      autocert.DirCache(dataDir),
+        }
+
+        httpsSrv = makeHTTPServer()
+        httpsSrv.Addr = ":443"
+        httpsSrv.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
+
+        go func() {
+            fmt.Printf("Starting HTTPS server on %s\n", httpsSrv.Addr)
+            err := httpsSrv.ListenAndServeTLS("", "")
+            if err != nil {
+                log.Fatalf("httpsSrv.ListendAndServeTLS() failed with %s", err)
+            }
+        }()
+    } else {
+        httpPort = "localhost:8080"
+    }
+
+    var httpSrv *http.Server
+    if flgRedirectHTTPToHTTPS {
+        httpSrv = makeHTTPToHTTPSRedirectServer()
+    } else {
+        httpSrv = makeHTTPServer()
+    }
+    // allow autocert handle Let's Encrypt callbacks over http
+    if m != nil {
+        httpSrv.Handler = m.HTTPHandler(httpSrv.Handler)
+    }
+
+    httpSrv.Addr = httpPort
+
+    // pfdata := setupPushfight()
+
+    fmt.Printf("Starting HTTP server on %s\n", httpPort)
+    err := httpSrv.ListenAndServe()
     if err != nil {
-        log.Fatal("ListenAndServe: ", err)
+        log.Fatalf("httpSrv.ListenAndServe() failed with %s", err)
     }
 }

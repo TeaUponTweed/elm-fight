@@ -48,7 +48,7 @@
 
 
     function requestStatus(gameID, cb) {
-        const request = new Request('https://' + document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {

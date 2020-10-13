@@ -144,12 +144,15 @@ func main() {
         httpPort = "0.0.0.0:80"
         hostPolicy := func(ctx context.Context, host string) error {
             // Note: change to your real host
-            allowedHost := "www.masonuvagun.xyz"
+            allowedHosts := []string{"www.masonuvagun.xyz", "masonuvagun.xyz"}
             fmt.Println(host)
-            if host == allowedHost {
-                return nil
+            for _, allowedHost := range allowedHosts {
+                if host == allowedHost {
+                    return nil
+                }                
             }
-            return fmt.Errorf("acme/autocert: only %s host is allowed", allowedHost)
+
+            return fmt.Errorf("acme/autocert: only %s hosts are allowed", allowedHosts)
         }
 
         dataDir := "."
@@ -171,7 +174,7 @@ func main() {
             }
         }()
     } else {
-        httpPort = "localhost:8080"
+        httpPort = "0.0.0.0:8080"
     }
 
     var httpSrv *http.Server

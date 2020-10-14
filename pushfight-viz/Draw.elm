@@ -3,6 +3,8 @@ module Draw exposing (board, isInBoard, pusher, mover, anchor)
 import List
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
+import Html.Events.Extra.Touch as Touch
+import PFTypes exposing (Msg(..))
 
 -- TODO implement rails
 
@@ -18,7 +20,7 @@ isInBoard x y =
         False
 
 
-drawBoardSquare : Int -> Int -> Int -> Svg msg
+drawBoardSquare : Int -> Int -> Int -> Svg Msg
 drawBoardSquare size y x =
     let
         (color, extraStyles) =
@@ -41,18 +43,18 @@ drawBoardSquare size y x =
 
 
 
-drawRow : Int -> List Int -> Int -> List (Svg msg)
+drawRow : Int -> List Int -> Int -> List (Svg Msg)
 drawRow size xs y =
     List.map (drawBoardSquare size y) xs
 
-board : Int -> List (Svg msg)
+board : Int -> List (Svg Msg)
 board size =
     List.map (drawRow size (List.range 0 9)) (List.range 0 3)
     |> List.concat
 
 
 
-pusher : Int -> Int -> Int -> String -> List (Svg msg)
+pusher : Int -> Int -> Int -> String -> List (Svg Msg)
 pusher size x y color =
     let
         (posx, posy, fsize) =
@@ -72,11 +74,12 @@ pusher size x y color =
             , Attributes.y <| String.fromInt <| round (posy + fsize * 0.1)
             , Attributes.width <| String.fromInt <| round (fsize * 0.8)
             , Attributes.height <| String.fromInt <| round (fsize * 0.8)
+            , Touch.onStart ( \e -> MouseDownAt (x*size + size//2 |> toFloat, y*size + size//2 |> toFloat) )
             ]
             []
         ]
 
-mover : Int -> Int -> Int -> String -> List (Svg msg)
+mover : Int -> Int -> Int -> String -> List (Svg Msg)
 mover size x y color =
     let
         (posx, posy, fsize) =
@@ -94,12 +97,13 @@ mover size x y color =
             , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
             , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
             , Attributes.r <| String.fromInt <| round ((fsize * 0.9) / 2.0)
+            , Touch.onStart ( \e -> MouseDownAt (x*size + size//2 |> toFloat, y*size + size//2 |> toFloat) )
             ]
             []
         ]
 
 
-anchor : Int -> Int -> Int -> List (Svg msg)
+anchor : Int -> Int -> Int -> List (Svg Msg)
 anchor size x y =
     let
         (posx, posy, fsize) =

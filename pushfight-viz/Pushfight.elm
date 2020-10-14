@@ -1,4 +1,4 @@
-module Pushfight exposing (init, update, view, Msg, Model, subscriptions, grabWindowWidth, checkForGameOver)
+module Pushfight exposing (init, update, view, Model, subscriptions, grabWindowWidth, checkForGameOver)
 
 --import Debug
 
@@ -15,6 +15,7 @@ import Html
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
+import Html.Events.Extra.Touch as Touch
 
 import Svg
 import Svg.Attributes
@@ -127,6 +128,19 @@ fromPxToGrid : Float -> Int -> Int
 fromPxToGrid x gridSize =
     (floor x)//gridSize
 
+touchCoordinates : Touch.Event -> ( Float, Float )
+touchCoordinates touchEvent =
+    List.head touchEvent.changedTouches
+        |> Maybe.map .clientPos
+        |> Maybe.withDefault ( 0, 0 )
+        |> Debug.log "touch"
+
+touchPosition : Touch.Event -> Position
+touchPosition touchEvent =
+    let
+        (x,y) = touchCoordinates touchEvent
+    in
+        {x=round x,y= round y}
 
 view : Model -> Html.Html Msg
 view model =
@@ -169,7 +183,13 @@ view model =
     in
     Html.div []
     [ Html.div [] [Html.text title]
-    , Html.div [Mouse.onDown (\event -> MouseDownAt event.offsetPos)]
+    , Html.div
+        [ Mouse.onDown (\event -> Debug.log "mouse" (MouseDownAt event.offsetPos))
+        --, Touch.onStart ( (Debug.log "MouseDownAt" ) << MouseDownAt << touchCoordinates )
+        , Touch.onEnd ( (Debug.log "DragEnd" ) << DragEnd << touchPosition )
+        , Touch.onCancel ( (Debug.log "DragEnd" ) << DragEnd << touchPosition )
+        , Touch.onMove ( (Debug.log "DragAt" ) << DragAt << touchPosition )
+        ]
         [ Svg.svg 
             [ Svg.Attributes.width width
             , Svg.Attributes.height height
@@ -231,8 +251,8 @@ grabWindowWidth : () -> Cmd Msg
 grabWindowWidth _ =
     Task.perform (WindowWidth << getViewportWidth) Browser.Dom.getViewport
 
-init : () -> ( Model, Cmd Msg )
-init _ =
+init : Int -> ( Model, Cmd Msg )
+init windowWidth =
     let
         startingPieces =
             [ ( (3, 2), Piece Mover  White )
@@ -249,8 +269,9 @@ init _ =
         --firstMoves = NoMoves startingPieces
         turn = Turn [] Nothing (Board startingPieces Nothing)
     in
-        ( Model turn WhiteSetup NotDragging 1000 100 False
+        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) False
         , grabWindowWidth ()
+        --, Cmd.none
         )
 
 
@@ -259,15 +280,6 @@ getViewportWidth {scene} =
     floor scene.width
 
 -- UPDATE
-
-type Msg
-    = DragAt Position
-    | DragEnd Position
-    | MouseDownAt (Float, Float)
-    | WindowWidth Int
-    | EndTurn
-    | Undo
-    | ToggleEndTurnOnPush
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -283,7 +295,7 @@ update msg model =
             )
 
         MouseDownAt (x, y) ->
-            ( handleClick model (fromPxToGrid x model.gridSize, fromPxToGrid y model.gridSize)
+            ( handleClick model (fromPxToGrid x model.gridSize |> Debug.log "xpos", fromPxToGrid y (Debug.log "grid size" model.gridSize) |> Debug.log "ypos")
             , Cmd.none
             )
         WindowWidth width ->

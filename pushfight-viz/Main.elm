@@ -1,4 +1,4 @@
-port module Main exposing (Msg,Model,init,update,view)
+port module Main exposing (..)
 
 import Browser
 --import Debug
@@ -9,6 +9,7 @@ import Html.Attributes exposing (placeholder, value)
 import Html.Events exposing (onClick, onInput)
 
 import Pushfight
+import PFTypes
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
 port requestNewGame : String -> Cmd msg
@@ -23,6 +24,8 @@ port receivePushfight : (D.Value -> msg) -> Sub msg
 
 port notifyExit : () -> Cmd msg
 
+type alias Flags =
+    { windowWidth : Int }
 
 type alias Game =
     { gameID: String
@@ -38,13 +41,14 @@ type Msg
     | UpdateJoinGameID String
     | PushfightFromServer Game
     | ExitGame
-    | PushfightMsg Pushfight.Msg
+    | PushfightMsg PFTypes.Msg
     | NoOp
 
 type alias Model =
     { game: Maybe Game
     , newGameID: String
     , joinGameID: String
+    , windowWidth: Int
     }
 
 view : Model -> Html Msg
@@ -69,9 +73,9 @@ view model =
             ]
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { game = Nothing , newGameID = "", joinGameID = ""}
+init : Flags -> ( Model, Cmd Msg )
+init {windowWidth} =
+    ( { game = Nothing , newGameID = "", joinGameID = "", windowWidth = windowWidth}
     , Cmd.none
     )
 
@@ -94,7 +98,7 @@ update msg model =
                     noop
             StartNewGame gameID ->
                     let
-                        (pushfight, cmdMsg) = Pushfight.init ()
+                        (pushfight, cmdMsg) = Pushfight.init model.windowWidth
                         game = { gameID = gameID, pushfight = pushfight}
                     in
                         ( { model | game = Just game}

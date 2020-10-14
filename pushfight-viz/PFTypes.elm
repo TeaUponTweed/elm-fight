@@ -29,6 +29,15 @@ type alias MovingPiece =
     , mouseDrag : Maybe MouseDrag
     }
 
+type Msg
+    = DragAt Position
+    | DragEnd Position
+    | MouseDownAt (Float, Float)
+    | WindowWidth Int
+    | EndTurn
+    | Undo
+    | ToggleEndTurnOnPush
+
 type alias Position =
     { x : Int
     , y : Int

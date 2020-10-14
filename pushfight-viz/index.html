@@ -2,12 +2,14 @@
 <html>
 
 <head>
-    <link rel="stylesheet" 
-          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" 
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
     <meta charset="UTF-8">
     <title>ElmFight</title>
     <script type="text/javascript" src="elm.js"></script>
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+
+    <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
 </head>
 
 <body>
@@ -17,7 +19,8 @@
 <script type="text/javascript">
     // Start the Elm application.
     var app = Elm.Main.init({
-        node: document.getElementById('ElmFight')
+        node: document.getElementById('ElmFight'),
+        flags: {'windowWidth': window.innerWidth}
     });
 
     // helpers for establishing websocket connection

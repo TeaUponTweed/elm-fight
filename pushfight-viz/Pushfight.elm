@@ -1,7 +1,5 @@
 module Pushfight exposing (init, update, view, Model, subscriptions, grabWindowWidth, checkForGameOver)
 
---import Debug
-
 import Dict exposing (Dict)
 import Set exposing (Set)
 
@@ -81,7 +79,6 @@ position =
 
 getWidthFromResize : Int -> Int -> Msg
 getWidthFromResize width height =
-    --WindowWidth (Debug.log "width" width)
     WindowWidth width
 
 subscriptions : Model -> Sub Msg
@@ -133,7 +130,6 @@ touchCoordinates touchEvent =
     List.head touchEvent.changedTouches
         |> Maybe.map .clientPos
         |> Maybe.withDefault ( 0, 0 )
-        |> Debug.log "touch"
 
 touchPosition : Touch.Event -> Position
 touchPosition touchEvent =
@@ -184,11 +180,10 @@ view model =
     Html.div []
     [ Html.div [] [Html.text title]
     , Html.div
-        [ Mouse.onDown (\event -> Debug.log "mouse" (MouseDownAt event.offsetPos))
-        --, Touch.onStart ( (Debug.log "MouseDownAt" ) << MouseDownAt << touchCoordinates )
-        , Touch.onEnd ( (Debug.log "DragEnd" ) << DragEnd << touchPosition )
-        , Touch.onCancel ( (Debug.log "DragEnd" ) << DragEnd << touchPosition )
-        , Touch.onMove ( (Debug.log "DragAt" ) << DragAt << touchPosition )
+        [ Mouse.onDown ( \event -> (MouseDownAt event.offsetPos) )
+        , Touch.onEnd ( DragEnd << touchPosition )
+        , Touch.onCancel ( DragEnd << touchPosition )
+        , Touch.onMove ( DragAt << touchPosition )
         ]
         [ Svg.svg 
             [ Svg.Attributes.width width
@@ -295,7 +290,7 @@ update msg model =
             )
 
         MouseDownAt (x, y) ->
-            ( handleClick model (fromPxToGrid x model.gridSize |> Debug.log "xpos", fromPxToGrid y (Debug.log "grid size" model.gridSize) |> Debug.log "ypos")
+            ( handleClick model ( fromPxToGrid x model.gridSize, fromPxToGrid y model.gridSize )
             , Cmd.none
             )
         WindowWidth width ->

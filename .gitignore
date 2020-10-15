@@ -1,5 +1,6 @@
 elm-stuff/*
-target/*
+target_prod/*
+target_devel/*
 elm.js
 elm.min.js
 firebase-debug.log

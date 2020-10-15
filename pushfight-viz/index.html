@@ -35,7 +35,7 @@
     function subToGame(gameID, openCB) {
         if (window["WebSocket"]) {
             closeConn();
-            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
+            conn = new WebSocket("wss://" + document.location.host + "/ws" + "?gameID=" + gameID);
             conn.onclose = function (evt) {
                 console.log("Host closed connection!")
                 app.ports.receiveConnectionLost.send("Host closed connection.")
@@ -51,7 +51,7 @@
 
 
     function requestStatus(gameID, cb) {
-        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('https://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {

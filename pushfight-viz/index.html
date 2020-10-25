@@ -17,6 +17,8 @@
 </body>
 
 <script type="text/javascript">
+window.onload = function() {
+
     // Start the Elm application.
     var app = Elm.Main.init({
         node: document.getElementById('ElmFight'),
@@ -32,7 +34,7 @@
         conn.close();
         conn = null;
     }
-    function subToGame(gameID, openCB) {
+    function subToGame(gameID, color=null) {
         if (window["WebSocket"]) {
             closeConn();
             conn = new WebSocket("wss://" + document.location.host + "/ws" + "?gameID=" + gameID);
@@ -41,6 +43,9 @@
                 app.ports.receiveConnectionLost.send("Host closed connection.")
             };
             conn.onmessage = function (evt) {
+                if (color) {
+                    evt.data['color'] = color
+                }
                 app.ports.receivePushfight.send(JSON.parse(evt.data));
             };
         } else {
@@ -83,18 +88,19 @@
         })
     })
 
-    // Handle join game attempts
-    app.ports.requestJoinGame.subscribe(function(gameID) {
+    function requestJoinGameImpl(gameID, color=null) {
         console.log("requestJoinGame")
         requestStatus(gameID, (data) => {
             if (data['joinGameIDValid']) {
-                subToGame(data['gameID'])
+                subToGame(data['gameID'], color)
             }
             else {
                 alert("Can't join game with ID = " + gameID + ". No matching game ID" )
             }
         })
-    })
+    }
+    // Handle join game attempts
+    app.ports.requestJoinGame.subscribe(requestJoinGameImpl)
 
     // send out board updates
     app.ports.sendPushfight.subscribe(function(data) {
@@ -112,7 +118,20 @@
         console.log("notifyExit")
         closeConn();
     })
-
+    // Handle initial URL params, if any
+    const queryString = window.location.search;
+    console.log(queryString);
+    const urlParams = new URLSearchParams(queryString);
+    const gameID = urlParams.get('gameID')
+    if (gameID) {
+        console.log("Got gameID from URL: " + gameID);
+        const color = urlParams.get('color')
+        if (color) {
+            console.log("Got color from URL: " + color);
+        }
+        requestJoinGameImpl(gameID)
+    }
+}
 </script>
 
 </html>

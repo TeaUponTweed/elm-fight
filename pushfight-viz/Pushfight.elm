@@ -264,7 +264,7 @@ init windowWidth =
         --firstMoves = NoMoves startingPieces
         turn = Turn [] Nothing (Board startingPieces Nothing)
     in
-        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) False
+        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) True
         , grabWindowWidth ()
         --, Cmd.none
         )

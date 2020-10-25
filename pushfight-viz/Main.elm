@@ -5,9 +5,9 @@ import Browser
 import Json.Decode as D
 import Json.Encode as E
 import Html exposing (Html, button, div, text, input)
-import Html.Attributes exposing (placeholder, value)
+import Html.Attributes exposing (placeholder, value, type_, style)
 import Html.Events exposing (onClick, onInput)
-
+import Validate exposing (isValidEmail)
 import Pushfight
 import PFTypes
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
@@ -24,12 +24,20 @@ port receivePushfight : (D.Value -> msg) -> Sub msg
 
 port notifyExit : () -> Cmd msg
 
+port registerEmail : E.Value -> Cmd msg
+
 type alias Flags =
     { windowWidth : Int }
 
 type alias Game =
     { gameID: String
     , pushfight: Pushfight.Model
+    }
+
+type alias EmailNotification =
+    { email: String
+    , notifyOnWhiteTurn: Bool
+    , notifyOnBlackTurn: Bool
     }
 
 type Msg
@@ -43,13 +51,26 @@ type Msg
     | ExitGame
     | PushfightMsg PFTypes.Msg
     | NoOp
+    | RegisterEmail
+    | UpdateNotificationEmail String
+    | ToggleNotifyOnWhiteTurn
+    | ToggleNotifyOnBlackTurn
 
 type alias Model =
     { game: Maybe Game
     , newGameID: String
     , joinGameID: String
     , windowWidth: Int
+    , email: EmailNotification
     }
+
+checkbox : msg -> String -> Html msg
+checkbox msg name =
+    Html.label
+        []
+        [ input [ type_ "checkbox", onClick msg ] []
+        , text name
+        ]
 
 view : Model -> Html Msg
 view model =
@@ -58,6 +79,12 @@ view model =
             div []
                 [ div [] [ "Game ID = " ++ game.gameID |> text]
                 , div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
+                , div []
+                    [ input [ placeholder "Notification Email", value model.email.email, onInput UpdateNotificationEmail ] []
+                    , div [] [ checkbox ToggleNotifyOnWhiteTurn "Notify On White's turn" ]
+                    , div [] [ checkbox ToggleNotifyOnBlackTurn "Notify On Black's turn" ]
+                    , div [] [ button [ onClick RegisterEmail ] [text "Get Notified" ] ]
+                    ]
                 , div [] [ button [ onClick ExitGame ] [ text "Leave Game" ] ]
                 ]
         Nothing ->
@@ -75,7 +102,7 @@ view model =
 
 init : Flags -> ( Model, Cmd Msg )
 init {windowWidth} =
-    ( { game = Nothing , newGameID = "", joinGameID = "", windowWidth = windowWidth}
+    ( { game = Nothing , newGameID = "", joinGameID = "", windowWidth = windowWidth, email = EmailNotification "" False False }
     , Cmd.none
     )
 
@@ -155,7 +182,7 @@ update msg model =
                 case model.game of
                     Just _ ->
                         ( { model | game = Just game}
-                        , Cmd.none
+                        , Pushfight.grabWindowWidth () |> Cmd.map PushfightMsg
                         )
                     Nothing ->
                         ( { model | game = Just game}
@@ -168,6 +195,43 @@ update msg model =
                 --        )
                 --    Err err ->
                 --        Debug.log err noop
+            RegisterEmail ->
+                if isValidEmail model.email.email && ( model.email.notifyOnBlackTurn || model.email.notifyOnWhiteTurn ) then
+                    case model.game of
+                        Just game ->
+                            let
+                                registerMsg =
+                                    encodeEmail game.gameID model.email |> registerEmail
+                            in
+                                ( { model | email = EmailNotification "" False False }
+                                , registerMsg
+                                )
+                        Nothing ->
+                            noop
+                else
+                    noop
+            ToggleNotifyOnBlackTurn ->
+                --let
+                    --newEmail = {model.email | notifyOnBlackTurn = !model.email.notifyOnBlackTurn}
+                --in
+                ( { model | email = EmailNotification model.email.email model.email.notifyOnWhiteTurn (not model.email.notifyOnBlackTurn) }
+                , Cmd.none
+                )
+            ToggleNotifyOnWhiteTurn ->
+                --let
+                    --newEmail = {model.email | notifyOnWhiteTurn = !model.email.notifyOnWhiteTurn}
+                --in
+                ( { model | email = EmailNotification model.email.email (not model.email.notifyOnWhiteTurn) model.email.notifyOnBlackTurn }
+                , Cmd.none
+                )
+            UpdateNotificationEmail s ->
+                let
+                    newEmail =
+                        EmailNotification s model.email.notifyOnWhiteTurn model.email.notifyOnBlackTurn
+                in
+                    ( { model | email = newEmail }
+                    , Cmd.none
+                    )
             NoOp ->
                 noop
 --windowWidth
@@ -225,3 +289,12 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
+
+encodeEmail: String -> EmailNotification -> E.Value
+encodeEmail gameID e =
+    E.object
+        [ ("gameID", E.string gameID)
+        , ("email", E.string e.email)
+        , ("notifyOnBlackTurn", E.bool e.notifyOnBlackTurn)
+        , ("notifyOnWhiteTurn", E.bool e.notifyOnBlackTurn)
+        ]

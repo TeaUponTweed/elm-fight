@@ -16,6 +16,7 @@
             "elm/svg": "1.0.1",
             "elm/url": "1.0.0",
             "mpizenberg/elm-pointer-events": "3.1.0",
+            "rtfeldman/elm-validate": "4.0.1",
             "truqu/elm-md5": "1.1.0"
         },
         "indirect": {

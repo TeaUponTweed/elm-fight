@@ -9,7 +9,7 @@ import Html.Attributes exposing (placeholder, value, type_, style)
 import Html.Events exposing (onClick, onInput)
 import Validate exposing (isValidEmail)
 import Pushfight
-import PFTypes
+import PFTypes exposing (Orientation(..))
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
 port requestNewGame : String -> Cmd msg
@@ -237,14 +237,14 @@ update msg model =
 --windowWidth
 --gridSize
 --endTurnOnPush
-mapPushFightDecode: Int -> Int -> Bool -> D.Value -> Msg
-mapPushFightDecode windowWidth gridSize endTurnOnPush json = 
+mapPushFightDecode: PFTypes.Orientation -> Int -> Int -> Bool -> D.Value -> Msg
+mapPushFightDecode orientation windowWidth gridSize endTurnOnPush json = 
 --decodePushfight windowWidth gridSize endTurnOnPush decodedBoard  =
     --decodedBoard
     case D.decodeValue pushfightDecoderImpl json of
         Ok pushfight ->
             PushfightFromServer
-            { pushfight = (decodePushfight windowWidth gridSize endTurnOnPush pushfight)
+            { pushfight = (decodePushfight orientation windowWidth gridSize endTurnOnPush pushfight)
             , gameID = pushfight.gameID
             }
         Err e ->
@@ -263,22 +263,22 @@ mapNewGameDecode json =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     let
-        (msgs, (windowWidth, gridSize), endTurnOnPush) =
+        (msgs, (orientation, windowWidth, gridSize), endTurnOnPush) =
             case model.game of
                 Just game ->
                     ( Pushfight.subscriptions game.pushfight |> Sub.map PushfightMsg
-                    , ( game.pushfight.windowWidth , game.pushfight.gridSize )
+                    , ( game.pushfight.orientation, game.pushfight.windowWidth , game.pushfight.gridSize )
                     , game.pushfight.endTurnOnPush
                     )
                 Nothing ->
                     ( Sub.batch []
-                    , ( 1000 , 100 )
+                    , ( Zero, 1000 , 100 )
                     , False
                     )
     in
         Sub.batch
         [ msgs
-        , receivePushfight (mapPushFightDecode windowWidth gridSize endTurnOnPush)
+        , receivePushfight (mapPushFightDecode orientation windowWidth gridSize endTurnOnPush)
         , receiveNewGame StartNewGame
         , receiveConnectionLost ConnectionLost
         ]

@@ -32,6 +32,7 @@ type alias Model =
     , windowWidth : Int
     , gridSize : Int
     , endTurnOnPush : Bool
+    , orientation: Orientation
     }
 
 main =
@@ -101,8 +102,8 @@ mouseSubsrciptions model =
 
 -- view
 
-drawPiece : Int -> Bool -> (PositionKey, Piece) -> List (Svg.Svg Msg)
-drawPiece size isMoving ( (x, y), {kind, color} ) =
+drawPiece : Orientation -> Int -> Bool -> (PositionKey, Piece) -> List (Svg.Svg Msg)
+drawPiece orientation size isMoving ( (x, y), {kind, color} ) =
     let
         colorString =
             if isMoving then
@@ -113,12 +114,14 @@ drawPiece size isMoving ( (x, y), {kind, color} ) =
                         "#ffffff"
                     Black ->
                         "#000000"
+        (updatedX, updatedY) = Draw.mapXY orientation x y
+
     in
         case kind of
             Pusher ->
-                Draw.pusher size x y colorString
+                Draw.pusher size updatedX updatedY colorString
             Mover ->
-                Draw.mover size x y colorString
+                Draw.mover size updatedX updatedY colorString
 
 
 fromPxToGrid : Float -> Int -> Int
@@ -142,22 +145,48 @@ view : Model -> Html.Html Msg
 view model =
     let
         size = model.gridSize
-        width = String.fromInt (10*size)
-        height = String.fromInt (4*size)
+        (widthi, heighti) =
+            case model.orientation of
+                Zero ->
+                    (10, 4)
+                Ninety ->
+                    (4, 10)
+                OneEighty ->
+                    (10, 4)
+                TwoSeventy ->
+                    (4, 10)
+
+        width = String.fromInt (widthi*size)--(10*size)
+        height = String.fromInt (heighti*size)--(4*size)
         board = getBoard model
         anchor = getAnchor model
         anchorSVGs =
             case anchor of
                 Just {x, y} ->
-                    Draw.anchor size x y
+                    let
+                        (xr, yr) =
+                            Draw.mapXY model.orientation x y
+                    in
+                        Draw.anchor size xr yr
+
                 Nothing ->
                     []
         movingPiece =
             case model.dragState of
                 DraggingPiece {piece, from, mouseDrag} ->
                     List.concat
-                        [ drawPiece size True ((from.x, from.y), piece)
-                        , drawPiece size False ((getGridPos from mouseDrag model.gridSize), piece)
+                        --[ drawPiece Zero size True ((Draw.mapXY model.orientation from.x from.y), piece)
+                        --, drawPiece Zero size False ((getGridPos model.orientation from mouseDrag model.gridSize), piece)
+
+                        --[ drawPiece model.orientation size True ((Draw.mapXY model.orientation from.x from.y), piece)
+                        --, drawPiece model.orientation size False ((getGridPos model.orientation from mouseDrag model.gridSize), piece)
+
+                        --[ drawPiece model.orientation size True ((from.x, from.y), piece)
+                        --, drawPiece Zero size False ((getGridPos model.orientation from mouseDrag model.gridSize), piece)
+
+                        [ drawPiece model.orientation size True ((from.x, from.y), piece)
+                        , drawPiece model.orientation size False ((getGridPos model.orientation from mouseDrag model.gridSize), piece)
+
                         ]
                 _ ->
                     []
@@ -191,8 +220,8 @@ view model =
             , Svg.Attributes.viewBox <| "0 0 " ++ width ++ " " ++ height
             ]
             ( List.concat
-                [ Draw.board size
-                , List.concat (List.map (drawPiece size False) <| Dict.toList board.pieces)
+                [ Draw.board model.orientation size
+                , List.concat (List.map (drawPiece model.orientation size False) <| Dict.toList board.pieces)
                 , anchorSVGs
                 , movingPiece
                 ]
@@ -201,6 +230,7 @@ view model =
     , Html.div []
         [ Html.button [ Html.Events.onClick EndTurn ] [ Html.text "End Turn" ]
         , Html.button [ Html.Events.onClick Undo ] [ Html.text "Undo" ]
+        , Html.button [ Html.Events.onClick RotateOrientationCCW ] [ Html.text "Rotate CCW" ]
         ]
     , Html.div []
         [ Html.label []
@@ -219,8 +249,10 @@ sign n =
     else
         1
 
-getGridPos : Position -> Maybe MouseDrag -> Int -> PositionKey
-getGridPos {x, y} mouseDrag gridSize =
+getGridPos : Orientation -> Position -> Maybe MouseDrag -> Int -> PositionKey
+getGridPos orientation {x, y} mouseDrag gridSize =
+    --let
+    --    (xx, yy) =
     case mouseDrag of
         Just {dragStart, dragCurrent} ->
             let
@@ -230,12 +262,16 @@ getGridPos {x, y} mouseDrag gridSize =
                     (dragCurrent.y - dragStart.y)
                 dx = ( (sign dxpx) * (abs dxpx + (gridSize // 2)) ) // gridSize
                 dy = ( (sign dypx) * (abs dypx + (gridSize // 2)) ) // gridSize
+                (xr, yr) = Draw.mapXY orientation x y
+                --(dxx)
             in
-                ( x  + dx
-                , y  + dy
-                )
+                Draw.mapXY orientation (xr  + dx) (yr  + dy)
         Nothing ->
             ( x, y )
+    --in
+        --Draw.mapXY orientation xx yy
+
+
 -- TODO
 -- * store grid coordinates vs pixels explicitly
 -- * Refactor board/piece movement to not allow invalid states
@@ -264,7 +300,7 @@ init windowWidth =
         --firstMoves = NoMoves startingPieces
         turn = Turn [] Nothing (Board startingPieces Nothing)
     in
-        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) True
+        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) True Zero
         , grabWindowWidth ()
         --, Cmd.none
         )
@@ -294,9 +330,21 @@ update msg model =
             , Cmd.none
             )
         WindowWidth width ->
-            ( { model | windowWidth = width, gridSize = width // 10 }
-            , Cmd.none
-            )
+            let
+                widthDivisor =
+                    case model.orientation of
+                        Zero ->
+                            10
+                        Ninety ->
+                            4
+                        OneEighty ->
+                            10
+                        TwoSeventy ->
+                            4
+            in
+                ( { model | windowWidth = width, gridSize = width // 10 }
+                , Cmd.none
+                )
         ToggleEndTurnOnPush ->
             ( { model | endTurnOnPush = not model.endTurnOnPush }
             , Cmd.none
@@ -382,6 +430,23 @@ update msg model =
                             ( model
                             , Cmd.none
                             )
+        RotateOrientationCCW ->
+            let
+                (newOrientation, newWidth, oldWidth) =
+                    case model.orientation of
+                        Zero ->
+                            (Ninety, 4, 10)
+                        Ninety ->
+                            (OneEighty, 10, 4)
+                        OneEighty ->
+                            (TwoSeventy, 4, 10)
+                        TwoSeventy ->
+                            (Zero, 10, 4)
+            in
+                ( { model | orientation = newOrientation } -- , gridSize = model.windowWidth//newWidth }
+                , Cmd.none
+                --,  grabWindowWidth ()
+                )
 
 handleDrag : Model -> Position -> Model
 handleDrag model mousePos =
@@ -465,7 +530,9 @@ handleDragEnd model =
         DraggingPiece {piece, from, mouseDrag} ->
             let
                 (toX, toY) =
-                    getGridPos from mouseDrag model.gridSize
+                    getGridPos model.orientation from mouseDrag model.gridSize
+                --(fromX, fromY) =
+                --    Draw.mapXY model.orientation from.x from.y
                 updatedTurn =
                     move model (from.x, from.y) (toX, toY)
                 updatedModel =
@@ -483,7 +550,11 @@ handleDragEnd model =
             { model | dragState = NotDragging }
 
 handleClick : Model -> PositionKey -> Model
-handleClick model (x, y) =
+handleClick model (xu, yu) =
+    let
+        (x, y) =
+            Draw.mapXY model.orientation xu yu
+    in
     case Dict.get (x, y) (getBoard model).pieces of
         Just piece ->
             case model.dragState of

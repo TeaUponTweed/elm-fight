@@ -1,10 +1,10 @@
-module Draw exposing (board, isInBoard, pusher, mover, anchor)
+module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY)
 
 import List
 import Svg exposing (Svg)
 import Svg.Attributes as Attributes
 import Html.Events.Extra.Touch as Touch
-import PFTypes exposing (Msg(..))
+import PFTypes exposing (Msg(..), Orientation(..))
 
 -- TODO implement rails
 
@@ -19,21 +19,34 @@ isInBoard x y =
     else
         False
 
+mapXY: Orientation -> Int -> Int -> (Int, Int)
+mapXY orientation x y =
+    case orientation of
+        Zero ->
+            (x, y)
+        Ninety ->
+            (y, x)
+        OneEighty ->
+            (9 - x, 3 - y)
+        TwoSeventy ->
+            (y, 3 - x)
 
-drawBoardSquare : Int -> Int -> Int -> Svg Msg
-drawBoardSquare size y x =
+drawBoardSquare : Int -> (Int -> Int -> (Int, Int)) -> Int -> Int -> Svg Msg
+drawBoardSquare size rotateXY y x =
     let
+        (xr, yr) =
+            rotateXY x y
         (color, extraStyles) =
             if isInBoard x y then
                 ("#8B4513", [Attributes.strokeWidth "1", Attributes.stroke "black"])
             else
-                 ("#0000ff", [])
+                 ("#aaaaaa", [])
 
     in
         Svg.rect (
             List.append extraStyles
-                [ Attributes.x <| String.fromInt (size * x)
-                , Attributes.y <| String.fromInt (size * y)
+                [ Attributes.x <| String.fromInt (size * xr)
+                , Attributes.y <| String.fromInt (size * yr)
                 , Attributes.width <| String.fromInt size
                 , Attributes.height <| String.fromInt size
                 , Attributes.fill color
@@ -43,13 +56,14 @@ drawBoardSquare size y x =
 
 
 
-drawRow : Int -> List Int -> Int -> List (Svg Msg)
-drawRow size xs y =
-    List.map (drawBoardSquare size y) xs
+drawRow : Orientation -> Int -> List Int -> Int -> List (Svg Msg)
+drawRow orientation size xs y =
 
-board : Int -> List (Svg Msg)
-board size =
-    List.map (drawRow size (List.range 0 9)) (List.range 0 3)
+    List.map (drawBoardSquare size (mapXY orientation) y) xs
+
+board : Orientation -> Int -> List (Svg Msg)
+board orientation size =
+    List.map (drawRow orientation size (List.range 0 9)) (List.range 0 3)
     |> List.concat
 
 

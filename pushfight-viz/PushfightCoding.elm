@@ -222,8 +222,8 @@ splitLast l =
         x :: xs ->
             (List.reverse xs, Just x)
 
-decodePushfight : Int -> Int -> Bool -> DecodedBoard -> Model
-decodePushfight windowWidth gridSize endTurnOnPush decoded =
+decodePushfight : Orientation -> Int -> Int -> Bool -> DecodedBoard -> Model
+decodePushfight orientation windowWidth gridSize endTurnOnPush decoded =
     let
         ixToKey: Int -> PositionKey
         ixToKey ix =
@@ -317,6 +317,7 @@ decodePushfight windowWidth gridSize endTurnOnPush decoded =
             , currentTurn = turn
             , dragState = NotDragging
             , gameStage = gameStage
+            , orientation = orientation
             }
 
             --update EndTurn decodedModel

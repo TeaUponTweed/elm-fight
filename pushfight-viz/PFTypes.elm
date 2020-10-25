@@ -18,6 +18,12 @@ type Direction
     | Right
     | Down
 
+type Orientation
+    = Zero
+    | Ninety
+    | OneEighty
+    | TwoSeventy
+
 type alias Piece =
     { kind : PieceKind
     , color : PieceColor
@@ -37,6 +43,7 @@ type Msg
     | EndTurn
     | Undo
     | ToggleEndTurnOnPush
+    | RotateOrientationCCW
 
 type alias Position =
     { x : Int

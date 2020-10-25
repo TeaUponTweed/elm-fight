@@ -1,4 +1,4 @@
-module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY)
+module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY, rmapXY)
 
 import List
 import Svg exposing (Svg)
@@ -25,11 +25,23 @@ mapXY orientation x y =
         Zero ->
             (x, y)
         Ninety ->
-            (y, x)
+            (9 - y, x)
         OneEighty ->
             (9 - x, 3 - y)
         TwoSeventy ->
             (y, 3 - x)
+
+rmapXY: Orientation -> Int -> Int -> (Int, Int)
+rmapXY orientation x y =
+    case orientation of
+        Zero ->
+            (x, y)
+        Ninety ->
+            (y, 9 - x)
+        OneEighty ->
+            (9 - x, 3 - y)
+        TwoSeventy ->
+            (3 - y, x)
 
 drawBoardSquare : Int -> (Int -> Int -> (Int, Int)) -> Int -> Int -> Svg Msg
 drawBoardSquare size rotateXY y x =
@@ -59,7 +71,7 @@ drawBoardSquare size rotateXY y x =
 drawRow : Orientation -> Int -> List Int -> Int -> List (Svg Msg)
 drawRow orientation size xs y =
 
-    List.map (drawBoardSquare size (mapXY orientation) y) xs
+    List.map (drawBoardSquare size (rmapXY orientation) y) xs
 
 board : Orientation -> Int -> List (Svg Msg)
 board orientation size =

@@ -39,7 +39,7 @@ type Msg
     = DragAt Position
     | DragEnd Position
     | MouseDownAt (Float, Float)
-    | WindowWidth Int
+    | WindowDims (Int, Int)
     | EndTurn
     | Undo
     | ToggleEndTurnOnPush

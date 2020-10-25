@@ -27,7 +27,9 @@ port notifyExit : () -> Cmd msg
 port registerEmail : E.Value -> Cmd msg
 
 type alias Flags =
-    { windowWidth : Int }
+    { windowWidth : Int
+    , windowHeight : Int
+    }
 
 type alias Game =
     { gameID: String
@@ -60,7 +62,7 @@ type alias Model =
     { game: Maybe Game
     , newGameID: String
     , joinGameID: String
-    , windowWidth: Int
+    , windowDims: (Int,Int)
     , email: EmailNotification
     }
 
@@ -101,8 +103,8 @@ view model =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init {windowWidth} =
-    ( { game = Nothing , newGameID = "", joinGameID = "", windowWidth = windowWidth, email = EmailNotification "" False False }
+init {windowWidth, windowHeight} =
+    ( { game = Nothing , newGameID = "", joinGameID = "", windowDims = (windowWidth, windowHeight), email = EmailNotification "" False False }
     , Cmd.none
     )
 
@@ -125,7 +127,8 @@ update msg model =
                     noop
             StartNewGame gameID ->
                     let
-                        (pushfight, cmdMsg) = Pushfight.init model.windowWidth
+                        (windowWidth, windowHeight) = model.windowDims
+                        (pushfight, cmdMsg) = Pushfight.init windowWidth windowHeight
                         game = { gameID = gameID, pushfight = pushfight}
                     in
                         ( { model | game = Just game}
@@ -182,11 +185,11 @@ update msg model =
                 case model.game of
                     Just _ ->
                         ( { model | game = Just game}
-                        , Pushfight.grabWindowWidth () |> Cmd.map PushfightMsg
+                        , Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
                         )
                     Nothing ->
                         ( { model | game = Just game}
-                        , Pushfight.grabWindowWidth () |> Cmd.map PushfightMsg
+                        , Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
                         )
                 --case decodePushfight codedPushfight of
                 --    Ok (gameID, pushfight) ->
@@ -237,14 +240,14 @@ update msg model =
 --windowWidth
 --gridSize
 --endTurnOnPush
-mapPushFightDecode: PFTypes.Orientation -> Int -> Int -> Bool -> D.Value -> Msg
-mapPushFightDecode orientation windowWidth gridSize endTurnOnPush json = 
---decodePushfight windowWidth gridSize endTurnOnPush decodedBoard  =
+mapPushFightDecode: PFTypes.Orientation -> (Int,Int) -> Int -> Bool -> D.Value -> Msg
+mapPushFightDecode orientation windowDims gridSize endTurnOnPush json = 
+--decodePushfight windowDims gridSize endTurnOnPush decodedBoard  =
     --decodedBoard
     case D.decodeValue pushfightDecoderImpl json of
         Ok pushfight ->
             PushfightFromServer
-            { pushfight = (decodePushfight orientation windowWidth gridSize endTurnOnPush pushfight)
+            { pushfight = (decodePushfight orientation windowDims gridSize endTurnOnPush pushfight)
             , gameID = pushfight.gameID
             }
         Err e ->
@@ -263,22 +266,22 @@ mapNewGameDecode json =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     let
-        (msgs, (orientation, windowWidth, gridSize), endTurnOnPush) =
+        (msgs, (orientation, windowDims, gridSize), endTurnOnPush) =
             case model.game of
                 Just game ->
                     ( Pushfight.subscriptions game.pushfight |> Sub.map PushfightMsg
-                    , ( game.pushfight.orientation, game.pushfight.windowWidth , game.pushfight.gridSize )
+                    , ( game.pushfight.orientation, game.pushfight.windowDims , game.pushfight.gridSize )
                     , game.pushfight.endTurnOnPush
                     )
                 Nothing ->
                     ( Sub.batch []
-                    , ( Zero, 1000 , 100 )
+                    , ( Zero, (1000, 1000) , 100 )
                     , False
                     )
     in
         Sub.batch
         [ msgs
-        , receivePushfight (mapPushFightDecode orientation windowWidth gridSize endTurnOnPush)
+        , receivePushfight (mapPushFightDecode orientation windowDims gridSize endTurnOnPush)
         , receiveNewGame StartNewGame
         , receiveConnectionLost ConnectionLost
         ]

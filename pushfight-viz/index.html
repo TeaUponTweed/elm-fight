@@ -22,7 +22,7 @@ window.onload = function() {
     // Start the Elm application.
     var app = Elm.Main.init({
         node: document.getElementById('ElmFight'),
-        flags: {'windowWidth': window.innerWidth}
+        flags: {'windowWidth': window.innerWidth, 'windowHeight': window.innerHeight}
     });
 
     // helpers for establishing websocket connection

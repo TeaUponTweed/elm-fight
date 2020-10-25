@@ -222,8 +222,8 @@ splitLast l =
         x :: xs ->
             (List.reverse xs, Just x)
 
-decodePushfight : Orientation -> Int -> Int -> Bool -> DecodedBoard -> Model
-decodePushfight orientation windowWidth gridSize endTurnOnPush decoded =
+decodePushfight : Orientation -> (Int,Int) -> Int -> Bool -> DecodedBoard -> Model
+decodePushfight orientation windowDims gridSize endTurnOnPush decoded =
     let
         ixToKey: Int -> PositionKey
         ixToKey ix =
@@ -311,7 +311,7 @@ decodePushfight orientation windowWidth gridSize endTurnOnPush decoded =
         turn =
             Turn moves push board
         in
-            { windowWidth = windowWidth
+            { windowDims = windowDims
             , gridSize = gridSize
             , endTurnOnPush = endTurnOnPush
             , currentTurn = turn

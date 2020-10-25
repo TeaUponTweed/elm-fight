@@ -1,4 +1,4 @@
-module Pushfight exposing (init, update, view, Model, subscriptions, grabWindowWidth, checkForGameOver)
+module Pushfight exposing (init, update, view, Model, subscriptions, grabWindowDims, checkForGameOver)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -29,19 +29,19 @@ type alias Model =
     { currentTurn : Turn
     , gameStage : GameStage
     , dragState : DragState
-    , windowWidth : Int
+    , windowDims : (Int, Int)
     , gridSize : Int
     , endTurnOnPush : Bool
     , orientation: Orientation
     }
 
-main =
-    Browser.element
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        }
+--main =
+--    Browser.element
+--        { init = init
+--        , view = view
+--        , update = update
+--        , subscriptions = subscriptions
+--        }
 
 moveWrapper : Move -> Board -> Board
 moveWrapper {from, to} board =
@@ -78,15 +78,15 @@ position =
         (Decode.field "pageX" Decode.int)
         (Decode.field "pageY" Decode.int)
 
-getWidthFromResize : Int -> Int -> Msg
-getWidthFromResize width height =
-    WindowWidth width
+getDimsFromResize : Int -> Int -> Msg
+getDimsFromResize width height =
+    WindowDims (width, height)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
     [ mouseSubsrciptions model
-    , Browser.Events.onResize getWidthFromResize-- (Decode.map WindowWidth windowWidth)
+    , Browser.Events.onResize getDimsFromResize-- (Decode.map WindowWidth windowWidth)
     ]
 
 mouseSubsrciptions : Model -> Sub Msg
@@ -114,7 +114,7 @@ drawPiece orientation size isMoving ( (x, y), {kind, color} ) =
                         "#ffffff"
                     Black ->
                         "#000000"
-        (updatedX, updatedY) = Draw.mapXY orientation x y
+        (updatedX, updatedY) = Draw.rmapXY orientation x y
 
     in
         case kind of
@@ -165,7 +165,7 @@ view model =
                 Just {x, y} ->
                     let
                         (xr, yr) =
-                            Draw.mapXY model.orientation x y
+                            Draw.rmapXY model.orientation x y
                     in
                         Draw.anchor size xr yr
 
@@ -262,7 +262,7 @@ getGridPos orientation {x, y} mouseDrag gridSize =
                     (dragCurrent.y - dragStart.y)
                 dx = ( (sign dxpx) * (abs dxpx + (gridSize // 2)) ) // gridSize
                 dy = ( (sign dypx) * (abs dypx + (gridSize // 2)) ) // gridSize
-                (xr, yr) = Draw.mapXY orientation x y
+                (xr, yr) = Draw.rmapXY orientation x y
                 --(dxx)
             in
                 Draw.mapXY orientation (xr  + dx) (yr  + dy)
@@ -278,12 +278,12 @@ getGridPos orientation {x, y} mouseDrag gridSize =
 
 -- init
 
-grabWindowWidth : () -> Cmd Msg
-grabWindowWidth _ =
-    Task.perform (WindowWidth << getViewportWidth) Browser.Dom.getViewport
+grabWindowDims : () -> Cmd Msg
+grabWindowDims _ =
+    Task.perform (WindowDims << getViewportDims) Browser.Dom.getViewport
 
-init : Int -> ( Model, Cmd Msg )
-init windowWidth =
+init : Int -> Int -> ( Model, Cmd Msg )
+init windowWidth windowHeight =
     let
         startingPieces =
             [ ( (3, 2), Piece Mover  White )
@@ -300,15 +300,17 @@ init windowWidth =
         --firstMoves = NoMoves startingPieces
         turn = Turn [] Nothing (Board startingPieces Nothing)
     in
-        ( Model turn WhiteSetup NotDragging windowWidth (windowWidth//10) True Zero
-        , grabWindowWidth ()
+        ( Model turn WhiteSetup NotDragging (windowWidth, windowHeight) (min (windowWidth//4) ((windowHeight*3//5)//10)) True Ninety
+        , grabWindowDims ()
         --, Cmd.none
         )
 
 
-getViewportWidth : Browser.Dom.Viewport -> Int
-getViewportWidth {scene} =
-    floor scene.width
+getViewportDims : Browser.Dom.Viewport -> (Int, Int)
+getViewportDims {scene} =
+    ( floor scene.width
+    , floor scene.height
+    )
 
 -- UPDATE
 
@@ -329,20 +331,20 @@ update msg model =
             ( handleClick model ( fromPxToGrid x model.gridSize, fromPxToGrid y model.gridSize )
             , Cmd.none
             )
-        WindowWidth width ->
+        WindowDims (width, height) ->
             let
-                widthDivisor =
+                (widthDivisor, heightDivisor) =
                     case model.orientation of
                         Zero ->
-                            10
+                            (10, 4)
                         Ninety ->
-                            4
+                            (4, 10)
                         OneEighty ->
-                            10
+                            (10, 4)
                         TwoSeventy ->
-                            4
+                            (4, 10)
             in
-                ( { model | windowWidth = width, gridSize = width // 10 }
+                ( { model | windowDims = (width, height), gridSize = min (width // widthDivisor) ((height*3//5)//heightDivisor) }
                 , Cmd.none
                 )
         ToggleEndTurnOnPush ->
@@ -445,7 +447,7 @@ update msg model =
             in
                 ( { model | orientation = newOrientation } -- , gridSize = model.windowWidth//newWidth }
                 , Cmd.none
-                --,  grabWindowWidth ()
+                --,  grabWindowDims ()
                 )
 
 handleDrag : Model -> Position -> Model

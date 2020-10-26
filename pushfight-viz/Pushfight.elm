@@ -1,4 +1,4 @@
-module Pushfight exposing (init, update, view, Model, subscriptions, grabWindowDims, checkForGameOver)
+module Pushfight exposing (..)
 
 import Dict exposing (Dict)
 import Set exposing (Set)
@@ -92,7 +92,7 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
     [ mouseSubsrciptions model
-    , Browser.Events.onResize getDimsFromResize-- (Decode.map WindowWidth windowWidth)
+    --, Browser.Events.onResize getDimsFromResize-- (Decode.map WindowWidth windowWidth)
     ]
 
 mouseSubsrciptions : Model -> Sub Msg
@@ -113,7 +113,7 @@ drawPiece orientation size isMoving ( (x, y), {kind, color} ) =
     let
         (colorString, accentColorString) =
             if isMoving then
-                ("#888888", "#888888")
+                (Draw.pieceMovingColor, Draw.boardColor)
             else
                 case color of
                     White ->
@@ -157,13 +157,15 @@ touchPosition touchEvent =
 --white = 
 --    Element.rgb255 255 255 255
 backgroundColor =
-    Element.rgb255 231 223 198
+    --Element.rgb255 255 244 181
+    --Element.rgb255 206 223 217
+    Element.rgb255 242 245 234
 buttonColor =
-    Element.rgb255 34 116 165
+    Element.rgb255 164 36 69
 black =
-    Element.rgb255 19 27 35
+    Element.rgb255 25 24 10
 white = 
-    Element.rgb255 233 241 247
+    Element.rgb255 255 250 255
 
 myButton: Msg -> String -> Element Msg
 myButton msg txt =
@@ -173,7 +175,8 @@ myButton msg txt =
     --, Border.color white
     --, Border.solid
     --, Border.width 3
-    , padding 20
+    , Border.rounded 15
+    , padding 15
     , Background.color buttonColor
     ]
     { onPress = Just msg
@@ -269,7 +272,7 @@ view model =
 
     in
     Element.layout [] <|
-        Element.column [centerX]
+        Element.column [centerX, spacing 40]
         [ Element.el [centerX, Font.size (windowHeight//20)] (text title)
         , hline
         , Element.el [centerX, Font.size (windowHeight//20)] (Element.html boardViz)
@@ -352,9 +355,9 @@ getGridPos orientation {x, y} mouseDrag gridSize =
 
 -- init
 
-grabWindowDims : () -> Cmd Msg
-grabWindowDims _ =
-    Task.perform (WindowDims << getViewportDims) Browser.Dom.getViewport
+--grabWindowDims : () -> Cmd Msg
+--grabWindowDims _ =
+--    Task.perform (WindowDims << getViewportDims) Browser.Dom.getViewport
 
 init : Int -> Int -> ( Model, Cmd Msg )
 init windowWidth windowHeight =
@@ -375,8 +378,8 @@ init windowWidth windowHeight =
         turn = Turn [] Nothing (Board startingPieces Nothing)
     in
         ( Model turn WhiteSetup NotDragging (windowWidth, windowHeight) (min (windowWidth//4) ((windowHeight*3//5)//10)) True Ninety
-        , grabWindowDims ()
-        --, Cmd.none
+        --, grabWindowDims ()
+        , Cmd.none
         )
 
 

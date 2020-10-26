@@ -1,4 +1,4 @@
-module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY, rmapXY, pieceColorWhite, pieceColorBlack)
+module Draw exposing (..)
 
 import List
 import Svg exposing (Svg)
@@ -44,11 +44,21 @@ rmapXY orientation x y =
             (3 - y, x)
 
 boardColor =
-    "#816C61"
+    "#BD632F"
+
 pieceColorWhite =
-    "#E9F1F7"
+    "#FFFAFA"
+
 pieceColorBlack =
-    "#131B23"
+    "#19180A"
+
+pieceMovingColor =
+    "#D8AC8D"
+    --"#8C8985"
+    --"#F2F5EA"
+
+anchorColor =
+    "#A4243B"
 
 drawBoardSquare : Int -> (Int -> Int -> (Int, Int)) -> Int -> Int -> Svg Msg
 drawBoardSquare size rotateXY y x =
@@ -144,7 +154,7 @@ anchor size x y =
     in
         [
             Svg.circle
-                [ Attributes.fill "#ff0000"
+                [ Attributes.fill anchorColor
                 , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
                 , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
                 , Attributes.r <| String.fromInt <| round (fsize / 4.0)

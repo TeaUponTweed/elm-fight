@@ -8,11 +8,12 @@ import Html exposing (Html, button, div, text, input)
 import Html.Attributes exposing (placeholder, value, type_, style)
 import Html.Events exposing (onClick, onInput)
 import Validate exposing (isValidEmail)
-import Pushfight
+import Pushfight exposing (backgroundColor,buttonColor,black,white)
+
 import PFTypes exposing (Orientation(..))
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
-import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column)
+import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column, alignBottom)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Input as Input
@@ -81,14 +82,14 @@ type alias Model =
 --        [ input [ type_ "checkbox", onClick msg ] []
 --        , text name
 --        ]
-backgroundColor =
-    Element.rgb255 231 223 198
-buttonColor =
-    Element.rgb255 34 116 165
-black =
-    Element.rgb255 19 27 35
-white = 
-    Element.rgb255 233 241 247
+--backgroundColor =
+--    Element.rgb255 255 244 181
+--buttonColor =
+--    Element.rgb255 164 36 69
+--black =
+--    Element.rgb255 25 24 10
+--white = 
+--    Element.rgb255 255 250 255
 
 bigButton: Msg -> String -> Element Msg
 bigButton msg txt =
@@ -98,8 +99,8 @@ bigButton msg txt =
     , Border.color white
     , Border.solid
     --, Border.width 10
-    , Border.rounded 40
-    , padding 50
+    , Border.rounded 15
+    , padding 20
     --, width "fill"
     , Background.color buttonColor
     ]
@@ -115,10 +116,27 @@ smallButton msg txt =
     , Border.color white
     , Border.solid
     --, Border.width 10
-    , Border.rounded 10
-    , padding 5
+    , Border.rounded 15
+    , padding 15
     --, width "fill"
     , Background.color buttonColor
+    ]
+    { onPress = Just msg
+    , label = Element.text txt
+    }
+leaveGameButton: Msg -> String -> Element Msg
+leaveGameButton msg txt =
+    Input.button
+    [ Font.color white
+    , centerX
+    , Border.color white
+    , Border.solid
+    --, Border.width 10
+    , Border.rounded 15
+    , padding 15
+    --, width "fill"
+    , Background.color black
+    --, alignBottom
     ]
     { onPress = Just msg
     , label = Element.text txt
@@ -134,7 +152,7 @@ view model =
                 Element.layout [Background.color backgroundColor] <|
                     Element.el [Font.size (windowHeight//40), centerX]
                     (
-                        column [centerY]
+                        column [spacing 15]
                         [ Element.el [centerX] (Element.text ("Game ID = " ++ game.gameID))
                         , Pushfight.view game.pushfight |> Html.map PushfightMsg |> Element.html
                         , Element.row 
@@ -162,7 +180,8 @@ view model =
                             , smallButton RegisterEmail "Get Notified"
                             ]
                             , Input.text [] {onChange = UpdateNotificationEmail, text = model.email.email, label = Input.labelHidden "", placeholder=Nothing}
-                            , smallButton ExitGame "Leave Game"
+                        --, hline--Element.el [padding 2000] Element.none
+                        , leaveGameButton ExitGame "Leave Game"
                         ]
                     )
                 --div [] []
@@ -295,11 +314,13 @@ update msg model =
                 case model.game of
                     Just _ ->
                         ( { model | game = Just game}
-                        , Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
+                        --, Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
+                        , Cmd.none
                         )
                     Nothing ->
                         ( { model | game = Just game}
-                        , Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
+                        --, Pushfight.grabWindowDims () |> Cmd.map PushfightMsg
+                        , Cmd.none
                         )
                 --case decodePushfight codedPushfight of
                 --    Ok (gameID, pushfight) ->
@@ -475,3 +496,7 @@ myCheckbox size checked =
             )
         ]
         Element.none
+
+hline : Element Msg
+hline =
+    Element.el [Element.width fill, Element.height (Element.px 5), Background.color black] Element.none

@@ -9,11 +9,17 @@ import Browser
 import Browser.Events
 import Browser.Dom
 
-import Html
+import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Mouse as Mouse
 import Html.Events.Extra.Touch as Touch
+
+import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Input as Input
+import Element.Font as Font
 
 import Svg
 import Svg.Attributes
@@ -105,23 +111,24 @@ mouseSubsrciptions model =
 drawPiece : Orientation -> Int -> Bool -> (PositionKey, Piece) -> List (Svg.Svg Msg)
 drawPiece orientation size isMoving ( (x, y), {kind, color} ) =
     let
-        colorString =
+        (colorString, accentColorString) =
             if isMoving then
-                "#888888"
+                ("#888888", "#888888")
             else
                 case color of
                     White ->
-                        "#ffffff"
+                        (Draw.pieceColorWhite, Draw.pieceColorBlack)
                     Black ->
-                        "#000000"
+                        (Draw.pieceColorBlack, Draw.pieceColorWhite)
+
         (updatedX, updatedY) = Draw.rmapXY orientation x y
 
     in
         case kind of
             Pusher ->
-                Draw.pusher size updatedX updatedY colorString
+                Draw.pusher size updatedX updatedY colorString accentColorString
             Mover ->
-                Draw.mover size updatedX updatedY colorString
+                Draw.mover size updatedX updatedY colorString accentColorString
 
 
 fromPxToGrid : Float -> Int -> Int
@@ -141,6 +148,41 @@ touchPosition touchEvent =
     in
         {x=round x,y= round y}
 
+--gray =
+--    Element.rgb255 238 238 238
+--darkerGray =
+--    Element.rgb255 150 100 100
+--black =
+--    Element.rgb255 23 23 23
+--white = 
+--    Element.rgb255 255 255 255
+backgroundColor =
+    Element.rgb255 231 223 198
+buttonColor =
+    Element.rgb255 34 116 165
+black =
+    Element.rgb255 19 27 35
+white = 
+    Element.rgb255 233 241 247
+
+myButton: Msg -> String -> Element Msg
+myButton msg txt =
+    Input.button
+    [ Font.color white
+    , centerX
+    --, Border.color white
+    --, Border.solid
+    --, Border.width 3
+    , padding 20
+    , Background.color buttonColor
+    ]
+    { onPress = Just msg
+    , label = Element.text txt
+    }
+hline : Element Msg
+hline =
+    Element.el [Element.width fill, Element.height (Element.px 5), Background.color black] Element.none
+
 view : Model -> Html.Html Msg
 view model =
     let
@@ -148,14 +190,14 @@ view model =
         (widthi, heighti) =
             case model.orientation of
                 Zero ->
-                    (10, 4)
+                    (9, 4)
                 Ninety ->
-                    (4, 10)
+                    (4, 9)
                 OneEighty ->
-                    (10, 4)
+                    (9, 4)
                 TwoSeventy ->
-                    (4, 10)
-
+                    (4, 9)
+        (windowWidth, windowHeight) = model.windowDims
         width = String.fromInt (widthi*size)--(10*size)
         height = String.fromInt (heighti*size)--(4*size)
         board = getBoard model
@@ -204,41 +246,73 @@ view model =
                     "WhiteWon"
                 BlackWon ->
                     "BlackWon"
+        boardViz =
+            Html.div
+            [ Mouse.onDown ( \event -> (MouseDownAt event.offsetPos) )
+            , Touch.onEnd ( DragEnd << touchPosition )
+            , Touch.onCancel ( DragEnd << touchPosition )
+            , Touch.onMove ( DragAt << touchPosition )
+            ]
+            [ Svg.svg 
+                [ Svg.Attributes.width width
+                , Svg.Attributes.height height
+                , Svg.Attributes.viewBox <| "0 0 " ++ width ++ " " ++ height
+                ]
+                ( List.concat
+                    [ Draw.board model.orientation size
+                    , List.concat (List.map (drawPiece model.orientation size False) <| Dict.toList board.pieces)
+                    , anchorSVGs
+                    , movingPiece
+                    ]
+                )
+            ]
 
     in
-    Html.div []
-    [ Html.div [] [Html.text title]
-    , Html.div
-        [ Mouse.onDown ( \event -> (MouseDownAt event.offsetPos) )
-        , Touch.onEnd ( DragEnd << touchPosition )
-        , Touch.onCancel ( DragEnd << touchPosition )
-        , Touch.onMove ( DragAt << touchPosition )
-        ]
-        [ Svg.svg 
-            [ Svg.Attributes.width width
-            , Svg.Attributes.height height
-            , Svg.Attributes.viewBox <| "0 0 " ++ width ++ " " ++ height
+    Element.layout [] <|
+        Element.column [centerX]
+        [ Element.el [centerX, Font.size (windowHeight//20)] (text title)
+        , hline
+        , Element.el [centerX, Font.size (windowHeight//20)] (Element.html boardViz)
+        , Element.row [spacing 10, Font.size (windowHeight//40), centerX]
+            [ myButton EndTurn "End Turn"
+            , myButton Undo "Undo"
+            , myButton RotateOrientationCCW "Rotate CCW"
             ]
-            ( List.concat
-                [ Draw.board model.orientation size
-                , List.concat (List.map (drawPiece model.orientation size False) <| Dict.toList board.pieces)
-                , anchorSVGs
-                , movingPiece
-                ]
-            )
+        , hline
         ]
-    , Html.div []
-        [ Html.button [ Html.Events.onClick EndTurn ] [ Html.text "End Turn" ]
-        , Html.button [ Html.Events.onClick Undo ] [ Html.text "Undo" ]
-        , Html.button [ Html.Events.onClick RotateOrientationCCW ] [ Html.text "Rotate CCW" ]
-        ]
-    , Html.div []
-        [ Html.label []
-            [ Html.input [ Html.Attributes.type_ "checkbox", Html.Events.onClick ToggleEndTurnOnPush ] []
-            , Html.text "End Turn on Push"
-            ]
-        ]
-    ]
+    --Html.div []
+    --[ Html.div [] [Html.text title]
+    --, Html.div
+    --    [ Mouse.onDown ( \event -> (MouseDownAt event.offsetPos) )
+    --    , Touch.onEnd ( DragEnd << touchPosition )
+    --    , Touch.onCancel ( DragEnd << touchPosition )
+    --    , Touch.onMove ( DragAt << touchPosition )
+    --    ]
+    --    [ Svg.svg 
+    --        [ Svg.Attributes.width width
+    --        , Svg.Attributes.height height
+    --        , Svg.Attributes.viewBox <| "0 0 " ++ width ++ " " ++ height
+    --        ]
+    --        ( List.concat
+    --            [ Draw.board model.orientation size
+    --            , List.concat (List.map (drawPiece model.orientation size False) <| Dict.toList board.pieces)
+    --            , anchorSVGs
+    --            , movingPiece
+    --            ]
+    --        )
+    --    ]
+    --, Html.div []
+    --    [ Html.button [ Html.Events.onClick EndTurn ] [ Html.text "End Turn" ]
+    --    , Html.button [ Html.Events.onClick Undo ] [ Html.text "Undo" ]
+    --    , Html.button [ Html.Events.onClick RotateOrientationCCW ] [ Html.text "Rotate CCW" ]
+    --    ]
+    --, Html.div []
+    --    [ Html.label []
+    --        [ Html.input [ Html.Attributes.type_ "checkbox", Html.Events.onClick ToggleEndTurnOnPush ] []
+    --        , Html.text "End Turn on Push"
+    --        ]
+    --    ]
+    --]
 
 -- util
 
@@ -626,3 +700,5 @@ turnTransition board gameStage =
                     BlackTurn
                 _ ->
                     gameStage
+
+

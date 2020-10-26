@@ -1,4 +1,4 @@
-module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY, rmapXY)
+module Draw exposing (board, isInBoard, pusher, mover, anchor, mapXY, rmapXY, pieceColorWhite, pieceColorBlack)
 
 import List
 import Svg exposing (Svg)
@@ -43,6 +43,13 @@ rmapXY orientation x y =
         TwoSeventy ->
             (3 - y, x)
 
+boardColor =
+    "#816C61"
+pieceColorWhite =
+    "#E9F1F7"
+pieceColorBlack =
+    "#131B23"
+
 drawBoardSquare : Int -> (Int -> Int -> (Int, Int)) -> Int -> Int -> Svg Msg
 drawBoardSquare size rotateXY y x =
     let
@@ -50,9 +57,9 @@ drawBoardSquare size rotateXY y x =
             rotateXY x y
         (color, extraStyles) =
             if isInBoard x y then
-                ("#8B4513", [Attributes.strokeWidth "1", Attributes.stroke "black"])
+                (boardColor, [Attributes.strokeWidth "1", Attributes.stroke "black"])
             else
-                 ("#aaaaaa", [])
+                 ("#aaaaaa", [Attributes.fillOpacity "0"])
 
     in
         Svg.rect (
@@ -80,14 +87,14 @@ board orientation size =
 
 
 
-pusher : Int -> Int -> Int -> String -> List (Svg Msg)
-pusher size x y color =
+pusher : Int -> Int -> Int -> String -> String -> List (Svg Msg)
+pusher size x y color accentColor =
     let
         (posx, posy, fsize) =
             (toFloat (size * x), toFloat (size * y), toFloat size)
     in
         [ Svg.rect
-            [ Attributes.fill "#333333"
+            [ Attributes.fill accentColor
             , Attributes.x <| String.fromInt <| round (posx + fsize * 0.02)
             , Attributes.y <| String.fromInt <| round (posy + fsize * 0.02)
             , Attributes.width <| String.fromInt <| round (fsize * 0.96)
@@ -96,23 +103,23 @@ pusher size x y color =
             []
         , Svg.rect
             [ Attributes.fill color
-            , Attributes.x <| String.fromInt <| round (posx + fsize * 0.1)
-            , Attributes.y <| String.fromInt <| round (posy + fsize * 0.1)
-            , Attributes.width <| String.fromInt <| round (fsize * 0.8)
-            , Attributes.height <| String.fromInt <| round (fsize * 0.8)
+            , Attributes.x <| String.fromInt <| round (posx + fsize * 0.05)
+            , Attributes.y <| String.fromInt <| round (posy + fsize * 0.05)
+            , Attributes.width <| String.fromInt <| round (fsize * 0.9)
+            , Attributes.height <| String.fromInt <| round (fsize * 0.9)
             , Touch.onStart ( \e -> MouseDownAt (x*size + size//2 |> toFloat, y*size + size//2 |> toFloat) )
             ]
             []
         ]
 
-mover : Int -> Int -> Int -> String -> List (Svg Msg)
-mover size x y color =
+mover : Int -> Int -> Int -> String -> String -> List (Svg Msg)
+mover size x y color accentColor =
     let
         (posx, posy, fsize) =
             (toFloat (size * x), toFloat (size * y), toFloat size)
     in
         [ Svg.circle
-            [ Attributes.fill "#333333"
+            [ Attributes.fill accentColor
             , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
             , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
             , Attributes.r <| String.fromInt <| round (fsize / 2.0)
@@ -122,7 +129,7 @@ mover size x y color =
             [ Attributes.fill color
             , Attributes.cx <| String.fromInt <| round (posx + (fsize / 2.0))
             , Attributes.cy <| String.fromInt <| round (posy + (fsize / 2.0))
-            , Attributes.r <| String.fromInt <| round ((fsize * 0.9) / 2.0)
+            , Attributes.r <| String.fromInt <| round ((fsize * 0.95) / 2.0)
             , Touch.onStart ( \e -> MouseDownAt (x*size + size//2 |> toFloat, y*size + size//2 |> toFloat) )
             ]
             []

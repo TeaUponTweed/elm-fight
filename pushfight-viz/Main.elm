@@ -12,6 +12,13 @@ import Pushfight
 import PFTypes exposing (Orientation(..))
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
+import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column)
+import Element.Background as Background
+import Element.Border as Border
+import Element.Input as Input
+import Element.Font as Font
+
+
 port requestNewGame : String -> Cmd msg
 port receiveNewGame : (String -> msg) -> Sub msg
 
@@ -47,65 +54,168 @@ type Msg
     | TryJoinGame
     | ConnectionLost String
     | StartNewGame String
-    | UpdateNewGameID String
-    | UpdateJoinGameID String
+    | UpdateGameID String
+    --| UpdateNewGameID String
+    --| UpdateJoinGameID String
     | PushfightFromServer Game
     | ExitGame
     | PushfightMsg PFTypes.Msg
     | NoOp
     | RegisterEmail
     | UpdateNotificationEmail String
-    | ToggleNotifyOnWhiteTurn
-    | ToggleNotifyOnBlackTurn
+    | ToggleNotifyOnWhiteTurn Bool
+    | ToggleNotifyOnBlackTurn Bool
 
 type alias Model =
     { game: Maybe Game
-    , newGameID: String
-    , joinGameID: String
+    , gameID: String
+    --, joinGameID: String
     , windowDims: (Int,Int)
     , email: EmailNotification
     }
 
-checkbox : msg -> String -> Html msg
-checkbox msg name =
-    Html.label
-        []
-        [ input [ type_ "checkbox", onClick msg ] []
-        , text name
-        ]
+--checkbox : msg -> String -> Html msg
+--checkbox msg name =
+--    Html.label
+--        []
+--        [ input [ type_ "checkbox", onClick msg ] []
+--        , text name
+--        ]
+backgroundColor =
+    Element.rgb255 231 223 198
+buttonColor =
+    Element.rgb255 34 116 165
+black =
+    Element.rgb255 19 27 35
+white = 
+    Element.rgb255 233 241 247
 
+bigButton: Msg -> String -> Element Msg
+bigButton msg txt =
+    Input.button
+    [ Font.color white
+    , centerX
+    , Border.color white
+    , Border.solid
+    --, Border.width 10
+    , Border.rounded 40
+    , padding 50
+    --, width "fill"
+    , Background.color buttonColor
+    ]
+    { onPress = Just msg
+    , label = Element.text txt
+    }
+
+smallButton: Msg -> String -> Element Msg
+smallButton msg txt =
+    Input.button
+    [ Font.color white
+    , centerX
+    , Border.color white
+    , Border.solid
+    --, Border.width 10
+    , Border.rounded 10
+    , padding 5
+    --, width "fill"
+    , Background.color buttonColor
+    ]
+    { onPress = Just msg
+    , label = Element.text txt
+    }
 view : Model -> Html Msg
 view model =
-    case model.game of
-        Just game ->
-            div []
-                [ div [] [ "Game ID = " ++ game.gameID |> text]
-                , div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
-                , div []
-                    [ input [ placeholder "Notification Email", value model.email.email, onInput UpdateNotificationEmail ] []
-                    , div [] [ checkbox ToggleNotifyOnWhiteTurn "Notify On White's turn" ]
-                    , div [] [ checkbox ToggleNotifyOnBlackTurn "Notify On Black's turn" ]
-                    , div [] [ button [ onClick RegisterEmail ] [text "Get Notified" ] ]
-                    ]
-                , div [] [ button [ onClick ExitGame ] [ text "Leave Game" ] ]
-                ]
-        Nothing ->
-          div []
-            [ div []
-                [ input [ placeholder "New Game ID", value model.newGameID, onInput UpdateNewGameID ] []
-                , button [ onClick TryNewGame ] [ text "Start New Game" ]
-                ]
-            , div []
-                [ input [ placeholder "Join Game ID", value model.joinGameID, onInput UpdateJoinGameID ] []
-                , button [ onClick TryJoinGame ] [ text "Join Game" ]
-                ]
-            ]
+    let
+        (windowWidth, windowHeight) =
+            model.windowDims
+    in
+        case model.game of
+            Just game ->
+                Element.layout [Background.color backgroundColor] <|
+                    Element.el [Font.size (windowHeight//40), centerX]
+                    (
+                        column [centerY]
+                        [ Element.el [centerX] (Element.text ("Game ID = " ++ game.gameID))
+                        , Pushfight.view game.pushfight |> Html.map PushfightMsg |> Element.html
+                        , Element.row 
+                            [ centerX
+                            , spacing 15
+                            ]
+                            [ Element.column []
+                                [ Input.checkbox []
+                                { onChange = \v -> ToggleNotifyOnWhiteTurn v
+                                , icon = myCheckbox (windowHeight//50)
+                                , checked = model.email.notifyOnWhiteTurn
+                                , label =
+                                    Input.labelRight []
+                                        (Element.text "White")
+                                }
+                                , Input.checkbox []
+                                    { onChange = \v -> ToggleNotifyOnBlackTurn v
+                                    , icon = myCheckbox (windowHeight//50)
+                                    , checked = model.email.notifyOnBlackTurn
+                                    , label =
+                                        Input.labelRight []
+                                            (Element.text "Black")
+                                    }
+                                ]
+                            , smallButton RegisterEmail "Get Notified"
+                            ]
+                            , Input.text [] {onChange = UpdateNotificationEmail, text = model.email.email, label = Input.labelHidden "", placeholder=Nothing}
+                            , smallButton ExitGame "Leave Game"
+                        ]
+                    )
+                --div [] []
+                    --[ div [] [ "Game ID = " ++ game.gameID |> text]
+                    --, div [] [ Pushfight.view game.pushfight |> Html.map PushfightMsg ]
+                    --, div []
+                    --    [ input [ placeholder "Notification Email", value model.email.email, onInput UpdateNotificationEmail ] []
+                    --    , div [] [ checkbox ToggleNotifyOnWhiteTurn "Notify On White's turn" ]
+                    --    , div [] [ checkbox ToggleNotifyOnBlackTurn "Notify On Black's turn" ]
+                    --    , div [] [ button [ onClick RegisterEmail ] [text "Get Notified" ] ]
+                    --    ]
+                    --, div [] [ button [ onClick ExitGame ] [ text "Leave Game" ] ]
+                    --]
+            Nothing ->
+                Element.layout [Background.color backgroundColor] <|
+                    Element.el [Font.size (windowHeight//30), centerX, centerY]
+                    (
+                        column [centerY, spacing 30]
+                        [ bigButton TryNewGame "Start New Game"
+                        --[ Input.button [Font.color black, centerX, Border.color black, Border.solid, Border.width 3, Background.color buttonColor] { onPress = Just TryNewGame, label = Element.text "Start New Game"}
+                        , Input.text [] {onChange= UpdateGameID, text= model.gameID, label= Input.labelHidden "", placeholder=Nothing} --Just (Input.placeholder [] Element.text "Enter Game ID")}
+                        --, Input.button [Font.color black, centerX, Border.color black, Border.solid, Border.width 3, Background.color buttonColor] { onPress = Just TryJoinGame, label = Element.text "Join Game"}
+                        , bigButton TryJoinGame "Join Game"
+                        ]
+                    )
+                    --(
+                    --    (Element.text "Howdy!")
+                    --    --row [ width fill, centerY, spacing 30 ]
+                    --    --[Element.el [centerX] (Element.text "Howdy!")]
+                    --)
+
+              --div []
+              --  [ div []
+              --      [ input [ placeholder "New Game ID", value model.newGameID, onInput UpdateNewGameID ] []
+              --      , button [ onClick TryNewGame ] [ text "Start New Game" ]
+              --      ]
+              --  , div []
+              --      [ input [ placeholder "Join Game ID", value model.joinGameID, onInput UpdateJoinGameID ] []
+              --      , button [ onClick TryJoinGame ] [ text "Join Game" ]
+              --      ]
+              --  ]
 
 
 init : Flags -> ( Model, Cmd Msg )
 init {windowWidth, windowHeight} =
-    ( { game = Nothing , newGameID = "", joinGameID = "", windowDims = (windowWidth, windowHeight), email = EmailNotification "" False False }
-    , Cmd.none
+    (
+        { game = Nothing
+        , gameID = ""
+        --, joinGameID = ""
+        , windowDims = (windowWidth, windowHeight)
+        , email = EmailNotification "" False False
+        }
+        , Cmd.none
     )
 
 boardChange: Pushfight.Model -> Pushfight.Model -> Bool
@@ -119,9 +229,9 @@ update msg model =
     in
         case msg of
             TryNewGame ->
-                if String.length model.newGameID > 0 then
+                if String.length model.gameID > 0 then
                     ( model
-                    , requestNewGame model.newGameID
+                    , requestNewGame model.gameID
                     )
                 else
                     noop
@@ -138,13 +248,13 @@ update msg model =
                             ]
                         )
             TryJoinGame ->
-                if String.length model.joinGameID > 0 then
+                if String.length model.gameID > 0 then
                     case model.game of
                         Just _ ->
                             noop
                         Nothing ->
                             ( model
-                            , requestJoinGame model.joinGameID
+                            , requestJoinGame model.gameID
                             )
                 else
                     noop
@@ -152,14 +262,14 @@ update msg model =
                 ( { model | game = Nothing }
                 , notifyExit ()
                 )
-            UpdateNewGameID gameID ->
-                ( { model | newGameID = gameID }
+            UpdateGameID gameID ->
+                ( { model | gameID = gameID }
                 , Cmd.none
                 )
-            UpdateJoinGameID gameID ->
-                ( { model | joinGameID = gameID }
-                , Cmd.none
-                )
+            --UpdateJoinGameID gameID ->
+            --    ( { model | joinGameID = gameID }
+            --    , Cmd.none
+            --    )
             ConnectionLost _ ->
                 ( { model | game = Nothing}
                 , Cmd.none
@@ -213,18 +323,18 @@ update msg model =
                             noop
                 else
                     noop
-            ToggleNotifyOnBlackTurn ->
+            ToggleNotifyOnBlackTurn v ->
                 --let
                     --newEmail = {model.email | notifyOnBlackTurn = !model.email.notifyOnBlackTurn}
                 --in
-                ( { model | email = EmailNotification model.email.email model.email.notifyOnWhiteTurn (not model.email.notifyOnBlackTurn) }
+                ( { model | email = EmailNotification model.email.email model.email.notifyOnWhiteTurn v }
                 , Cmd.none
                 )
-            ToggleNotifyOnWhiteTurn ->
+            ToggleNotifyOnWhiteTurn v ->
                 --let
                     --newEmail = {model.email | notifyOnWhiteTurn = !model.email.notifyOnWhiteTurn}
                 --in
-                ( { model | email = EmailNotification model.email.email (not model.email.notifyOnWhiteTurn) model.email.notifyOnBlackTurn }
+                ( { model | email = EmailNotification model.email.email v model.email.notifyOnBlackTurn }
                 , Cmd.none
                 )
             UpdateNotificationEmail s ->
@@ -301,3 +411,67 @@ encodeEmail gameID e =
         , ("notifyOnBlackTurn", E.bool e.notifyOnBlackTurn)
         , ("notifyOnWhiteTurn", E.bool e.notifyOnBlackTurn)
         ]
+
+myCheckbox : Int -> Bool -> Element msg
+myCheckbox size checked =
+    Element.el
+        [Element.width
+            (Element.px size)
+        , Element.height (Element.px size)
+        , Font.color white
+        , Element.centerY
+        , Font.size 9
+        , Font.center
+        , Border.rounded 3
+        , Border.color <|
+            if checked then
+                buttonColor
+                --Element.rgb (252 / 255) (153 / 255) (59 / 255)
+
+            else
+                black
+                --Element.rgb (211 / 255) (211 / 255) (211 / 255)
+        , Border.shadow
+            { offset = ( 0, 0 )
+            , blur = 1
+            , size = 1
+            , color =
+                if checked then
+                    Element.rgba (238 / 255) (238 / 255) (238 / 255) 0
+
+                else
+                    Element.rgb (238 / 255) (238 / 255) (238 / 255)
+            }
+        , Background.color <|
+            if checked then
+                --Element.rgb (252 / 255) (153 / 255) (59 / 255)
+                buttonColor
+            else
+                white
+        , Border.width <|
+            if checked then
+                0
+
+            else
+                1
+        , Element.inFront
+            (Element.el
+                [ Border.color white
+                , Element.height (Element.px 6)
+                , Element.width (Element.px 9)
+                , Element.rotate (degrees -45)
+                , Element.centerX
+                , Element.centerY
+                , Element.moveUp 1
+                , Element.transparent (not checked)
+                , Border.widthEach
+                    { top = 0
+                    , left = 2
+                    , bottom = 2
+                    , right = 0
+                    }
+                ]
+                Element.none
+            )
+        ]
+        Element.none

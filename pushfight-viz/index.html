@@ -8,21 +8,55 @@
     <title>ElmFight</title>
     <script type="text/javascript" src="elm.js"></script>
     <meta name="viewport" content="width=device-width, user-scalable=no">
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <meta name="google-signin-client_id" content="273516271136-8jbk5ujh74gc2hhnhssnkuifavt20mg9.apps.googleusercontent.com">
 
     <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
 </head>
 
 <body>
+    <div class="g-signin2" data-onsuccess="onSignIn" id="signInButton"></div>
     <div id="ElmFight"></div>
 </body>
 
 <script type="text/javascript">
-window.onload = function() {
+function onSignIn(googleUser) {
+  var profile = googleUser.getBasicProfile();
+  // console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
+  // console.log('Name: ' + profile.getName());
+  // console.log('Image URL: ' + profile.getImageUrl());
+  console.log('Email: ' + profile.getEmail()); // This is null if the 'email' scope is not present.
+  // signInButton
+    var x = document.getElementById("signInButton");
+    x.style.display = "none";
+    initApp(profile.getEmail());
+}
+
+var vis = (function(){
+    var stateKey, eventKey, keys = {
+        hidden: "visibilitychange",
+        webkitHidden: "webkitvisibilitychange",
+        mozHidden: "mozvisibilitychange",
+        msHidden: "msvisibilitychange"
+    };
+    for (stateKey in keys) {
+        if (stateKey in document) {
+            eventKey = keys[stateKey];
+            break;
+        }
+    }
+    return function(c) {
+        if (c) document.addEventListener(eventKey, c);
+        return !document[stateKey];
+    }
+})();
+
+function initApp(email) {
 
     // Start the Elm application.
     var app = Elm.Main.init({
         node: document.getElementById('ElmFight'),
-        flags: {'windowWidth': window.innerWidth, 'windowHeight': window.innerHeight}
+        flags: {'windowWidth': window.innerWidth, 'windowHeight': window.innerHeight, 'email': email}
     });
 
     // helpers for establishing websocket connection
@@ -69,7 +103,7 @@ window.onload = function() {
                 }
             }).catch(error => {
                 console.error(error);
-            });   
+            });
     }
     // console.log(app.ports)
     // Handle new game attempts
@@ -86,6 +120,17 @@ window.onload = function() {
                 alert("Can't start new game with ID = " + gameID + ". ID already in use." )
             }
         })
+    })
+
+    app.ports.sendNotificationEmail.subscribe(function(gameID) {
+        if (!vis()) {
+            alert("Next turn!")
+        }
+        const r = 'https://' + document.location.host + '/sendNotificationEmail?email='+email+'&gameID='+gameID
+        const request = new Request(r);
+        console.log("in sendNotificationEmail " + r)
+        fetch(request)
+            // .then(response => {})
     })
 
     function requestJoinGameImpl(gameID, color=null) {
@@ -132,6 +177,7 @@ window.onload = function() {
         requestJoinGameImpl(gameID)
     }
 }
+
 </script>
 
 </html>

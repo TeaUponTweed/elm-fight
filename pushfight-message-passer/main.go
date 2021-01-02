@@ -14,7 +14,7 @@ import (
     "log"
     "net/http"
     "time"
-
+    "os/exec"
     "golang.org/x/crypto/acme/autocert"
 )
 
@@ -86,6 +86,27 @@ func parseFlags() {
     flag.Parse()
 }
 
+func sendNotificationEmail(w http.ResponseWriter, r *http.Request) {
+    email, ok := r.URL.Query()["email"]
+    if !ok || len(email) != 1 {
+        http.Error(w, "No email specified specified", http.StatusInternalServerError)
+        return
+    }
+    gameID, ok := r.URL.Query()["gameID"]
+    
+    if !ok || len(gameID) < 1 {
+        log.Println("Url Param 'gameID' is missing")
+        return
+    }
+    // exec.Command("python", "../send_gmail/send.py", "turn_notification", email[0],  gameID[0])
+    // cmd := fmt.Sprintf("./send.py turn_notification %s %s", email[0],  gameID[0])
+    err := exec.Command("./send.py", "turn_notification", email[0], gameID[0]).Run()
+    if err != nil {
+        log.Println("Failed to run email cmd")
+        // log.Println(err)
+    }
+}
+
 func makeHTTPServer() *http.Server {
     mux := &http.ServeMux{}
     hubs := make(map[string]*Hub)
@@ -110,6 +131,7 @@ func makeHTTPServer() *http.Server {
     // mux.HandleFunc("/.well-known/pki-validation/B0BF35BDC0BC60AD9175C9CEA6E49315.txt", serveDNSValid)
     mux.HandleFunc("/elm.js", serveJS)
     mux.HandleFunc("/gameIDStatus", handleGameID)
+    mux.HandleFunc("/sendNotificationEmail", sendNotificationEmail)
     mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
         gameIDs, ok := r.URL.Query()["gameID"]
         
@@ -174,7 +196,7 @@ func main() {
             }
         }()
     } else {
-        httpPort = "0.0.0.0:8080"
+        httpPort = "0.0.0.0:8000"
     }
 
     var httpSrv *http.Server

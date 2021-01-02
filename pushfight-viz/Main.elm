@@ -10,7 +10,7 @@ import Html.Events exposing (onClick, onInput)
 import Validate exposing (isValidEmail)
 import Pushfight exposing (backgroundColor,buttonColor,black,white)
 
-import PFTypes exposing (Orientation(..))
+import PFTypes exposing (Orientation(..), Msg(..), GameStage(..))
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
 import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column, alignBottom)
@@ -32,11 +32,14 @@ port receivePushfight : (D.Value -> msg) -> Sub msg
 
 port notifyExit : () -> Cmd msg
 
+port sendNotificationEmail : String -> Cmd msg
+
 port registerEmail : E.Value -> Cmd msg
 
 type alias Flags =
     { windowWidth : Int
     , windowHeight : Int
+    , email: String
     }
 
 type alias Game =
@@ -62,8 +65,8 @@ type Msg
     | ExitGame
     | PushfightMsg PFTypes.Msg
     | NoOp
-    | RegisterEmail
-    | UpdateNotificationEmail String
+    --| RegisterEmail
+    --| UpdateNotificationEmail String
     | ToggleNotifyOnWhiteTurn Bool
     | ToggleNotifyOnBlackTurn Bool
 
@@ -152,34 +155,36 @@ view model =
                 Element.layout [Background.color backgroundColor] <|
                     Element.el [Font.size (windowHeight//40), centerX]
                     (
-                        column [spacing 15]
+                        column [spacing 5]
                         [ Element.el [centerX] (Element.text ("Game ID = " ++ game.gameID))
                         , Pushfight.view game.pushfight |> Html.map PushfightMsg |> Element.html
                         , Element.row 
                             [ centerX
                             , spacing 15
                             ]
-                            [ Element.column []
-                                [ Input.checkbox []
-                                { onChange = \v -> ToggleNotifyOnWhiteTurn v
-                                , icon = myCheckbox (windowHeight//50)
-                                , checked = model.email.notifyOnWhiteTurn
-                                , label =
-                                    Input.labelRight []
-                                        (Element.text "White")
-                                }
-                                , Input.checkbox []
-                                    { onChange = \v -> ToggleNotifyOnBlackTurn v
+                            [ Element.column [spacing 10]
+                                [ Element.row  [spacing 20]
+                                    [ Input.checkbox []
+                                    { onChange = \v -> ToggleNotifyOnWhiteTurn v
                                     , icon = myCheckbox (windowHeight//50)
-                                    , checked = model.email.notifyOnBlackTurn
+                                    , checked = model.email.notifyOnWhiteTurn
                                     , label =
                                         Input.labelRight []
-                                            (Element.text "Black")
+                                            (Element.text "Notify For White")
                                     }
+                                    , Input.checkbox []
+                                        { onChange = \v -> ToggleNotifyOnBlackTurn v
+                                        , icon = myCheckbox (windowHeight//50)
+                                        , checked = model.email.notifyOnBlackTurn
+                                        , label =
+                                            Input.labelRight []
+                                                (Element.text "Notify For Black")
+                                        }
+                                    ]
                                 ]
-                            , smallButton RegisterEmail "Get Notified"
+                            --, smallButton RegisterEmail "Get Notified"
                             ]
-                            , Input.text [] {onChange = UpdateNotificationEmail, text = model.email.email, label = Input.labelHidden "", placeholder=Nothing}
+                            --, Input.text [] {onChange = UpdateNotificationEmail, text = model.email.email, label = Input.labelHidden "", placeholder=Nothing}
                         --, hline--Element.el [padding 2000] Element.none
                         , leaveGameButton ExitGame "Leave Game"
                         ]
@@ -226,13 +231,13 @@ view model =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init {windowWidth, windowHeight} =
+init {windowWidth, windowHeight, email} =
     (
         { game = Nothing
         , gameID = ""
         --, joinGameID = ""
         , windowDims = (windowWidth, windowHeight)
-        , email = EmailNotification "" False False
+        , email = EmailNotification email True True
         }
         , Cmd.none
     )
@@ -294,22 +299,52 @@ update msg model =
                 , Cmd.none
                 )
             PushfightMsg pfmsg ->
-                case model.game of
-                    Just game ->
-                        let
-                            (updatedPushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
-                            sndUpdateCmdMsg =
-                                if boardChange updatedPushfight game.pushfight then --pushfight /= game.pushfight then
-                                    [encodePushfight game.gameID updatedPushfight |> sendPushfight]
-                                else
-                                    []
+                let
+                    msgsToSend =
+                        case pfmsg of
+                            EndTurn ->
+                                case model.game of
+                                    Just game ->
+                                        case (game.pushfight.gameStage, model.email.notifyOnBlackTurn, model.email.notifyOnWhiteTurn) of
+                                            (WhiteSetup, True, False) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (WhiteTurn, True, False) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (WhiteSetup, True, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (WhiteTurn, True, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (BlackSetup, False, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (BlackTurn, False, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (BlackSetup, True, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            (BlackTurn, True, True) ->
+                                                [sendNotificationEmail game.gameID]
+                                            _ ->
+                                                []
+                                    Nothing ->
+                                        []
+                            _ ->
+                                []
+                in
+                    case model.game of
+                        Just game ->
+                            let
+                                (updatedPushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
+                                sndUpdateCmdMsg =
+                                    if boardChange updatedPushfight game.pushfight then --pushfight /= game.pushfight then
+                                        [encodePushfight game.gameID updatedPushfight |> sendPushfight]
+                                    else
+                                        []
 
-                        in
-                            ( { model | game = Just { pushfight = updatedPushfight, gameID = game.gameID } }
-                            , [Cmd.map PushfightMsg cmdMsg] ++ sndUpdateCmdMsg |> Cmd.batch
-                            )
-                    Nothing ->
-                        noop
+                            in
+                                ( { model | game = Just { pushfight = updatedPushfight, gameID = game.gameID } }
+                                ,  [Cmd.map PushfightMsg cmdMsg] ++ sndUpdateCmdMsg ++ msgsToSend |> Cmd.batch
+                                )
+                        Nothing ->
+                            noop
             PushfightFromServer game ->
                 case model.game of
                     Just _ ->
@@ -329,21 +364,21 @@ update msg model =
                 --        )
                 --    Err err ->
                 --        Debug.log err noop
-            RegisterEmail ->
-                if isValidEmail model.email.email && ( model.email.notifyOnBlackTurn || model.email.notifyOnWhiteTurn ) then
-                    case model.game of
-                        Just game ->
-                            let
-                                registerMsg =
-                                    encodeEmail game.gameID model.email |> registerEmail
-                            in
-                                ( { model | email = EmailNotification "" False False }
-                                , registerMsg
-                                )
-                        Nothing ->
-                            noop
-                else
-                    noop
+            --RegisterEmail ->
+            --    if isValidEmail model.email.email && ( model.email.notifyOnBlackTurn || model.email.notifyOnWhiteTurn ) then
+            --        case model.game of
+            --            Just game ->
+            --                let
+            --                    registerMsg =
+            --                        encodeEmail game.gameID model.email |> registerEmail
+            --                in
+            --                    ( { model | email = EmailNotification "" False False }
+            --                    , registerMsg
+            --                    )
+            --            Nothing ->
+            --                noop
+            --    else
+            --        noop
             ToggleNotifyOnBlackTurn v ->
                 --let
                     --newEmail = {model.email | notifyOnBlackTurn = !model.email.notifyOnBlackTurn}
@@ -358,14 +393,14 @@ update msg model =
                 ( { model | email = EmailNotification model.email.email v model.email.notifyOnBlackTurn }
                 , Cmd.none
                 )
-            UpdateNotificationEmail s ->
-                let
-                    newEmail =
-                        EmailNotification s model.email.notifyOnWhiteTurn model.email.notifyOnBlackTurn
-                in
-                    ( { model | email = newEmail }
-                    , Cmd.none
-                    )
+            --UpdateNotificationEmail s ->
+            --    let
+            --        newEmail =
+            --            EmailNotification s model.email.notifyOnWhiteTurn model.email.notifyOnBlackTurn
+            --    in
+            --        ( { model | email = newEmail }
+            --        , Cmd.none
+            --        )
             NoOp ->
                 noop
 --windowWidth

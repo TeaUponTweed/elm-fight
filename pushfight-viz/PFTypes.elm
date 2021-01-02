@@ -42,7 +42,7 @@ type Msg
     | WindowDims (Int, Int)
     | EndTurn
     | Undo
-    | ToggleEndTurnOnPush
+    | ToggleEndTurnOnPush Bool
     | RotateOrientationCCW
 
 type alias Position =

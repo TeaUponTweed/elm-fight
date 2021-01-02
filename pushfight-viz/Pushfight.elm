@@ -31,6 +31,7 @@ import Draw
 import PFTypes exposing (..)
 import PFUtils exposing (doMove, doPush, isValidMove, isValidPush, isPositionInBoard)
 
+
 type alias Model =
     { currentTurn : Turn
     , gameStage : GameStage
@@ -272,14 +273,24 @@ view model =
 
     in
     Element.layout [] <|
-        Element.column [centerX, spacing 40]
-        [ Element.el [centerX, Font.size (windowHeight//20)] (text title)
+        Element.column [centerX, spacing 20]
+        [ Element.el [centerX, Font.size (windowHeight//30)] (text title)
         , hline
         , Element.el [centerX, Font.size (windowHeight//20)] (Element.html boardViz)
-        , Element.row [spacing 10, Font.size (windowHeight//40), centerX]
-            [ myButton EndTurn "End Turn"
-            , myButton Undo "Undo"
-            , myButton RotateOrientationCCW "Rotate CCW"
+        , Element.column [spacing 10]
+            [ Element.row [spacing 10, Font.size (windowHeight//40)]
+                [ myButton EndTurn "End Turn"
+                , myButton Undo "Undo"
+                , myButton RotateOrientationCCW "Rotate CCW"
+                ]
+            , Input.checkbox [Font.size (windowHeight//40)]
+                { onChange = \v -> ToggleEndTurnOnPush v
+                , icon = myCheckbox (windowHeight//50)
+                , checked = model.endTurnOnPush
+                , label =
+                    Input.labelRight []
+                        (Element.text "End Turn on push")
+                }
             ]
         , hline
         ]
@@ -424,8 +435,8 @@ update msg model =
                 ( { model | windowDims = (width, height), gridSize = min (width // widthDivisor) ((height*3//5)//heightDivisor) }
                 , Cmd.none
                 )
-        ToggleEndTurnOnPush ->
-            ( { model | endTurnOnPush = not model.endTurnOnPush }
+        ToggleEndTurnOnPush endTurnOnPush ->
+            ( { model | endTurnOnPush = endTurnOnPush }
             , Cmd.none
             )
         EndTurn ->
@@ -436,6 +447,7 @@ update msg model =
                     --getAnchor model
                 nextTurn = Turn [] Nothing board
                 noop = ( model, Cmd.none)
+
                     --case anchor of
                     --Just anchor ->
                     --    Turn [] Nothing board
@@ -705,3 +717,67 @@ turnTransition board gameStage =
                     gameStage
 
 
+
+myCheckbox : Int -> Bool -> Element msg
+myCheckbox size checked =
+    Element.el
+        [Element.width
+            (Element.px size)
+        , Element.height (Element.px size)
+        , Font.color white
+        , Element.centerY
+        , Font.size 9
+        , Font.center
+        , Border.rounded 3
+        , Border.color <|
+            if checked then
+                buttonColor
+                --Element.rgb (252 / 255) (153 / 255) (59 / 255)
+
+            else
+                black
+                --Element.rgb (211 / 255) (211 / 255) (211 / 255)
+        , Border.shadow
+            { offset = ( 0, 0 )
+            , blur = 1
+            , size = 1
+            , color =
+                if checked then
+                    Element.rgba (238 / 255) (238 / 255) (238 / 255) 0
+
+                else
+                    Element.rgb (238 / 255) (238 / 255) (238 / 255)
+            }
+        , Background.color <|
+            if checked then
+                --Element.rgb (252 / 255) (153 / 255) (59 / 255)
+                buttonColor
+            else
+                white
+        , Border.width <|
+            if checked then
+                0
+
+            else
+                1
+        , Element.inFront
+            (Element.el
+                [ Border.color white
+                , Element.height (Element.px 6)
+                , Element.width (Element.px 9)
+                , Element.rotate (degrees -45)
+                , Element.centerX
+                , Element.centerY
+                , Element.moveUp 1
+                , Element.transparent (not checked)
+                , Border.widthEach
+                    { top = 0
+                    , left = 2
+                    , bottom = 2
+                    , right = 0
+                    }
+                ]
+                Element.none
+            )
+        ]
+        Element.none

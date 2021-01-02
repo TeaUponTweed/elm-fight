@@ -115,6 +115,7 @@ pushImpl board from to =
         (fromX, fromY) = from
         dx = toX - fromX
         dy = toY - fromY
+
     in
         case Dict.get from board.pieces of
             Just {kind} ->
@@ -247,14 +248,25 @@ isValidMove board gameStage from to =
 
 isValidPush : Board -> GameStage -> PositionKey -> PositionKey -> Bool
 isValidPush board gameStage from to =
-    case pushImpl board from to of
-        Just _ ->
-            case gameStage of
-                WhiteTurn ->
-                    True
-                BlackTurn ->
-                    True
-                _ ->
-                    False
-        Nothing ->
-            False
+    let
+        pusherColor =    
+            case Dict.get from board.pieces of
+                Just {color} ->
+                    Just color
+                Nothing ->
+                    Nothing
+    in
+        case (pushImpl board from to, pusherColor) of
+            (Just _, Just c) ->
+                case gameStage of
+                    WhiteTurn ->
+                        c == White
+                        --case Dict.get board.pieces from
+                        --True
+                    BlackTurn ->
+                        --True
+                        c == Black
+                    _ ->
+                        False
+            _ ->
+                False

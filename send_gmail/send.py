@@ -1,8 +1,11 @@
+#!/usr/bin/env python
+
 from apiclient import errors
 from apiclient.discovery import build
 from base64 import urlsafe_b64encode
 from email.mime.text import MIMEText
 from httplib2 import Http
+from google.auth.transport.requests import Request
 # from oauth2client import file, client, tools
 import fire
 import pickle
@@ -68,9 +71,9 @@ def arbitrary(to, subject, msg):
     send_message(make_service(), "me", raw_msg)
 
 
-def turn_notification(to, gameID, color):
-    subject = f"It's {color}'s turn on game {gameID}"
-    msg = f'Go to masonuvagun.xyz?gameID={gameID}&color={color} to make your move'
+def turn_notification(to, gameID):
+    subject = f"It's the next turn for game {gameID}"
+    msg = f'Go to masonuvagun.xyz?gameID={gameID} to make your move'
     raw_msg = create_message("donotreply", to, subject, msg)
     send_message(make_service(), "me", raw_msg)
 

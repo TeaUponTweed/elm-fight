@@ -220,3 +220,5 @@ func main() {
         log.Fatalf("httpSrv.ListenAndServe() failed with %s", err)
     }
 }
+
+// ./pushfight-message-passer_linux --production --redirect-to-https

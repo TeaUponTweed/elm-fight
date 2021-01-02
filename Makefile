@@ -40,7 +40,7 @@ target_prod/pushfight-message-passer_linux ./target_prod/index.html ./target_pro
 	cp token.pickle target_prod/
 
 upload: ./target_prod/pushfight-message-passer_linux ./target_prod/elm.min.js ./target_prod/index.html ./target_prod/send.py
-	cd target && rsync -au pushfight-message-passer_linux index.html send.py nanode:webapp/
+	cd target_prod && rsync -au pushfight-message-passer_linux index.html send.py nanode:webapp/
 	scp ./target_prod/elm.min.js nanode:webapp/elm.js
 	scp ./target_prod/send.py nanode:webapp/send.py
 	scp ./target_prod/token.pickle nanode:webapp/token.pickle

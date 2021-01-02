@@ -45,6 +45,10 @@ type Msg
     | ToggleEndTurnOnPush Bool
     | RotateOrientationCCW
 
+type OutMsg
+    = PFNoOp
+    | PFTurnEnded
+
 type alias Position =
     { x : Int
     , y : Int
@@ -53,6 +57,9 @@ type alias Position =
 type alias PositionKey = (Int, Int)
 
 type alias Pieces = Dict PositionKey Piece
+
+--type ExteriorMsg
+--    = TurnEnded
 
 type alias Board =
     { pieces: Pieces

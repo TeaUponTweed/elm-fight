@@ -10,7 +10,7 @@ import Html.Events exposing (onClick, onInput)
 import Validate exposing (isValidEmail)
 import Pushfight exposing (backgroundColor,buttonColor,black,white)
 
-import PFTypes exposing (Orientation(..), Msg(..), GameStage(..))
+import PFTypes exposing (Orientation(..), Msg(..), OutMsg(..), GameStage(..))
 import PushfightCoding exposing (encodePushfight, decodePushfight, pushfightDecoderImpl)
 
 import Element exposing (Element, el, text, row, alignRight, fill, width, rgb255, spacing, centerY, centerX, padding, column, alignBottom)
@@ -32,8 +32,7 @@ port receivePushfight : (D.Value -> msg) -> Sub msg
 
 port notifyExit : () -> Cmd msg
 
-port sendNotificationEmail : String -> Cmd msg
-
+port sendNotificationEmail: String -> Cmd msg
 port registerEmail : E.Value -> Cmd msg
 
 type alias Flags =
@@ -69,6 +68,7 @@ type Msg
     --| UpdateNotificationEmail String
     | ToggleNotifyOnWhiteTurn Bool
     | ToggleNotifyOnBlackTurn Bool
+    --| ToggleNotify Bool
 
 type alias Model =
     { game: Maybe Game
@@ -207,7 +207,7 @@ view model =
                         column [centerY, spacing 30]
                         [ bigButton TryNewGame "Start New Game"
                         --[ Input.button [Font.color black, centerX, Border.color black, Border.solid, Border.width 3, Background.color buttonColor] { onPress = Just TryNewGame, label = Element.text "Start New Game"}
-                        , Input.text [] {onChange= UpdateGameID, text= model.gameID, label= Input.labelHidden "", placeholder=Nothing} --Just (Input.placeholder [] Element.text "Enter Game ID")}
+                        , Input.text [] {onChange = UpdateGameID, text= model.gameID, label= Input.labelHidden "", placeholder=Nothing} --Just (Input.placeholder [] Element.text "Enter Game ID")}
                         --, Input.button [Font.color black, centerX, Border.color black, Border.solid, Border.width 3, Background.color buttonColor] { onPress = Just TryJoinGame, label = Element.text "Join Game"}
                         , bigButton TryJoinGame "Join Game"
                         ]
@@ -245,6 +245,32 @@ init {windowWidth, windowHeight, email} =
 boardChange: Pushfight.Model -> Pushfight.Model -> Bool
 boardChange m1 m2 =
     (m1.currentTurn /= m2.currentTurn) || (m1.gameStage /= m2.gameStage)
+
+notificationMsgs: Model -> List (Cmd Msg)
+notificationMsgs model =
+    case model.game of
+        Just game ->
+            case (game.pushfight.gameStage, model.email.notifyOnBlackTurn, model.email.notifyOnWhiteTurn) of
+                --(WhiteSetup, True, False) ->
+                --    [sendNotificationEmail game.gameID]
+                (WhiteTurn, True, False) ->
+                    [sendNotificationEmail game.gameID]
+                --(WhiteSetup, True, True) ->
+                --    [sendNotificationEmail game.gameID]
+                (WhiteTurn, True, True) ->
+                    [sendNotificationEmail game.gameID]
+                --(BlackSetup, False, True) ->
+                --    [sendNotificationEmail game.gameID]
+                (BlackTurn, False, True) ->
+                    [sendNotificationEmail game.gameID]
+                --(BlackSetup, True, True) ->
+                --    [sendNotificationEmail game.gameID]
+                (BlackTurn, True, True) ->
+                    [sendNotificationEmail game.gameID]
+                _ ->
+                    []
+        Nothing ->
+            []
 
 update: Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -299,52 +325,29 @@ update msg model =
                 , Cmd.none
                 )
             PushfightMsg pfmsg ->
-                let
-                    msgsToSend =
-                        case pfmsg of
-                            EndTurn ->
-                                case model.game of
-                                    Just game ->
-                                        case (game.pushfight.gameStage, model.email.notifyOnBlackTurn, model.email.notifyOnWhiteTurn) of
-                                            (WhiteSetup, True, False) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (WhiteTurn, True, False) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (WhiteSetup, True, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (WhiteTurn, True, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (BlackSetup, False, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (BlackTurn, False, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (BlackSetup, True, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            (BlackTurn, True, True) ->
-                                                [sendNotificationEmail game.gameID]
-                                            _ ->
-                                                []
-                                    Nothing ->
+                case model.game of
+                    Just game ->
+                        let
+                            (updatedPushfight, cmdMsg, outMsg) = Pushfight.update pfmsg game.pushfight
+                            sndUpdateCmdMsg =
+                                if boardChange updatedPushfight game.pushfight then --pushfight /= game.pushfight then
+                                    [encodePushfight game.gameID updatedPushfight |> sendPushfight]
+                                else
+                                    []
+                            newMsgs =
+                                case outMsg of
+                                    PFNoOp ->
                                         []
-                            _ ->
-                                []
-                in
-                    case model.game of
-                        Just game ->
-                            let
-                                (updatedPushfight, cmdMsg) = Pushfight.update pfmsg game.pushfight
-                                sndUpdateCmdMsg =
-                                    if boardChange updatedPushfight game.pushfight then --pushfight /= game.pushfight then
-                                        [encodePushfight game.gameID updatedPushfight |> sendPushfight]
-                                    else
-                                        []
+                                    PFTurnEnded ->
+                                        notificationMsgs model
 
-                            in
-                                ( { model | game = Just { pushfight = updatedPushfight, gameID = game.gameID } }
-                                ,  [Cmd.map PushfightMsg cmdMsg] ++ sndUpdateCmdMsg ++ msgsToSend |> Cmd.batch
-                                )
-                        Nothing ->
-                            noop
+                        in
+
+                            ( { model | game = Just { pushfight = updatedPushfight, gameID = game.gameID } }
+                            ,  [Cmd.map PushfightMsg cmdMsg] ++ sndUpdateCmdMsg ++ newMsgs |> Cmd.batch
+                            )
+                    Nothing ->
+                        noop
             PushfightFromServer game ->
                 case model.game of
                     Just _ ->
@@ -440,10 +443,14 @@ subscriptions model =
                     , game.pushfight.endTurnOnPush
                     )
                 Nothing ->
-                    ( Sub.batch []
-                    , ( Zero, (1000, 1000) , 100 )
-                    , False
-                    )
+                    let
+                        (windowWidth, windowHeight) = model.windowDims
+                        (pushfight, _) = Pushfight.init windowWidth windowHeight
+                    in
+                        ( Sub.batch []
+                        , ( pushfight.orientation, (windowWidth, windowHeight) , pushfight.gridSize )
+                        , pushfight.endTurnOnPush
+                        )
     in
         Sub.batch
         [ msgs

@@ -40,6 +40,8 @@ type alias Model =
     , gridSize : Int
     , endTurnOnPush : Bool
     , orientation: Orientation
+    --, gameID: String
+    --, parentRouter: (ExteriorMsg -> ())
     }
 
 --main =
@@ -402,22 +404,36 @@ getViewportDims {scene} =
 
 -- UPDATE
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Cmd Msg, OutMsg )
 update msg model =
     case msg of
         DragAt mousePos ->
             ( handleDrag model mousePos
             , Cmd.none
+            , PFNoOp
             )
 
         DragEnd mousePos ->
-            ( handleDragEnd model
-            , Cmd.none
-            )
+            let
+                (newModel, turnEnded) =
+                    handleDragEnd model
+                upMsg =
+                    if turnEnded then
+                        PFTurnEnded
+                    else
+                        PFNoOp
+
+
+            in
+                ( newModel
+                , Cmd.none
+                , upMsg
+                )
 
         MouseDownAt (x, y) ->
             ( handleClick model ( fromPxToGrid x model.gridSize, fromPxToGrid y model.gridSize )
             , Cmd.none
+            , PFNoOp
             )
         WindowDims (width, height) ->
             let
@@ -434,10 +450,12 @@ update msg model =
             in
                 ( { model | windowDims = (width, height), gridSize = min (width // widthDivisor) ((height*3//5)//heightDivisor) }
                 , Cmd.none
+                , PFNoOp
                 )
         ToggleEndTurnOnPush endTurnOnPush ->
             ( { model | endTurnOnPush = endTurnOnPush }
             , Cmd.none
+            , PFNoOp
             )
         EndTurn ->
             let
@@ -446,7 +464,7 @@ update msg model =
                 --anchor =
                     --getAnchor model
                 nextTurn = Turn [] Nothing board
-                noop = ( model, Cmd.none)
+                noop = ( model, Cmd.none, PFTurnEnded)
 
                     --case anchor of
                     --Just anchor ->
@@ -458,16 +476,19 @@ update msg model =
                     WhiteSetup ->
                         ( { model | gameStage = BlackSetup, currentTurn = nextTurn }
                         , Cmd.none
+                        , PFTurnEnded
                         )
                     BlackSetup ->
                         ( { model | gameStage = WhiteTurn, currentTurn = nextTurn }
                         , Cmd.none
+                        , PFTurnEnded
                         )
                     WhiteTurn ->
                         case model.currentTurn.push of
                             Just push ->
                                 ( { model | gameStage = turnTransition (getBoard model) model.gameStage, currentTurn = nextTurn }
                                 , Cmd.none
+                                , PFTurnEnded
                                 )
                             Nothing ->
                                 noop
@@ -476,6 +497,7 @@ update msg model =
                             Just push ->
                                 ( { model | gameStage = turnTransition (getBoard model) model.gameStage, currentTurn = nextTurn }
                                 , Cmd.none
+                                , PFTurnEnded
                                 )
                             Nothing ->
                                 noop
@@ -494,6 +516,7 @@ update msg model =
                     in
                         ( { model | currentTurn = updatedTurn }
                         , Cmd.none
+                        , PFNoOp
                         )
                 Nothing ->
                     case model.currentTurn.moves of
@@ -506,6 +529,7 @@ update msg model =
                             in
                                 ( { model | currentTurn = updatedTurn }
                                 , Cmd.none
+                                , PFNoOp
                                 )
                         [m1, m2] ->
                             let
@@ -516,10 +540,12 @@ update msg model =
                             in
                                 ( { model | currentTurn = updatedTurn }
                                 , Cmd.none
+                                , PFNoOp
                                 )
                         _ ->
                             ( model
                             , Cmd.none
+                            , PFNoOp
                             )
         RotateOrientationCCW ->
             let
@@ -536,6 +562,7 @@ update msg model =
             in
                 ( { model | orientation = newOrientation } -- , gridSize = model.windowWidth//newWidth }
                 , Cmd.none
+                , PFNoOp
                 --,  grabWindowDims ()
                 )
 
@@ -615,7 +642,7 @@ move model from to =
         }
 
 
-handleDragEnd : Model -> Model
+handleDragEnd : Model -> (Model, Bool)
 handleDragEnd model =
     case model.dragState of
         DraggingPiece {piece, from, mouseDrag} ->
@@ -632,13 +659,16 @@ handleDragEnd model =
                 if model.endTurnOnPush then
                     case updatedTurn.push of
                         Just push ->
-                            Tuple.first (update EndTurn updatedModel)
+                            let
+                                (newModel, _, _) = update EndTurn updatedModel
+                            in
+                                (newModel, True)
                         Nothing  ->
-                            updatedModel
+                            (updatedModel, False)
                 else
-                    updatedModel
+                    (updatedModel, False)
         _ ->
-            { model | dragState = NotDragging }
+            ( { model | dragState = NotDragging }, False )
 
 handleClick : Model -> PositionKey -> Model
 handleClick model (xu, yu) =

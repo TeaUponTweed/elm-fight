@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from apiclient import errors
 from apiclient.discovery import build
@@ -73,7 +73,7 @@ def arbitrary(to, subject, msg):
 
 def turn_notification(to, gameID):
     subject = f"It's the next turn for game {gameID}"
-    msg = f'Go to masonuvagun.xyz?gameID={gameID} to make your move'
+    msg = f'Go to https://www.masonuvagun.xyz?gameID={gameID} to make your move'
     raw_msg = create_message("donotreply", to, subject, msg)
     send_message(make_service(), "me", raw_msg)
 

@@ -1,5 +1,8 @@
+elm-stuff
 elm-stuff/*
+target_prod
 target_prod/*
+target_devel
 target_devel/*
 elm.js
 elm.min.js

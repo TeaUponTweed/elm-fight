@@ -1,81 +1,60 @@
 #!/usr/bin/env python3
 
-from apiclient import errors
-from apiclient.discovery import build
-from base64 import urlsafe_b64encode
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from httplib2 import Http
-from google.auth.transport.requests import Request
-# from oauth2client import file, client, tools
+from contextlib import contextmanager
+from typing import Iterator
 import fire
-import pickle
 
-# https://developers.google.com/gmail/api/guides/sending
-def create_message(sender, to, subject, message_text):
-    """Create a message for an email.
-    Args:
-      sender: Email address of the sender.
-      to: Email address of the receiver.
-      subject: The subject of the email message.
-      message_text: The text of the email message.
-    Returns:
-      An object containing a base64url encoded email object.
-    """
-    message = MIMEText(message_text)
-    message['to'] = to
-    message['from'] = sender
-    message['subject'] = subject
-    encoded_message = urlsafe_b64encode(message.as_bytes())
-    return {'raw': encoded_message.decode()}
+_FROM_ADDRESS = "derivativeworks.co@gmail.com"
+to_address = "teaupontweed@gmail.com"
 
+def create_message(subject: str, receiver: str, contents_html: str, sender: str = _FROM_ADDRESS) -> MIMEMultipart:
+    # Create message container - the correct MIME type is multipart/alternative.
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = receiver
 
-# https://developers.google.com/gmail/api/guides/sending
-def send_message(service, user_id, message):
-    """Send an email message.
-    Args:
-      service: Authorized Gmail API service instance.
-      user_id: User's email address. The special value "me"
-      can be used to indicate the authenticated user.
-      message: Message to be sent.
-    Returns:
-      Sent Message.
-    """
-    message = (service.users().messages().send(userId=user_id, body=message)
-               .execute())
-    print('Message Id: %s' % message['id'])
-    return message
+    # Record the MIME type - text/html.
+    # TODO can add style https://developers.google.com/gmail/design/css#example
+    part1 = MIMEText(contents_html, 'html')
+
+    # Attach parts into message container
+    msg.attach(part1)
+
+    return msg
 
 
-def make_service():
-    SCOPE = 'https://www.googleapis.com/auth/gmail.compose' # Allows sending only, not reading
-
-    # Initialize the object for the Gmail API
-    # https://developers.google.com/gmail/api/quickstart/python
-    with open('token.pickle', 'rb') as token:
-        creds = pickle.load(token)
-    # If there are no (valid) credentials available, let the user log in.
-    if not creds.valid:
-        if creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-            # Save the credentials for the next run
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(creds, token)
-        else:
-            raise ValueError("Credential not valid!")
-    service = build('gmail', 'v1', credentials=creds)
-    return service
+# Sending the email
+@contextmanager
+def _get_server() -> Iterator[smtplib.SMTP]:
+    # Credentials
+    username = os.environ['GMAIL_EMAIL']  
+    password = os.environ['GMAIL_SMTP_PW']
+    server = smtplib.SMTP('smtp.gmail.com', 587) 
+    server.ehlo()
+    server.starttls()
+    server.login(username,password)  
+    try:
+        yield server
+    finally:
+        server.quit()
 
 
-def arbitrary(to, subject, msg):
-    raw_msg = create_message("donotreply", to, subject, msg)
-    send_message(make_service(), "me", raw_msg)
-
+def arbitrary(to: str, subject: str, msg: str):
+    msg = create_message(receiver=to, subject=subject, contents_html=msg)
+    with _get_server() as server:
+        server.sendmail(_FROM_ADDRESS, to, msg.as_string())
 
 def turn_notification(to, gameID):
     subject = f"It's the next turn for game {gameID}"
-    msg = f'Go to https://www.masonuvagun.xyz?gameID={gameID} to make your move'
-    raw_msg = create_message("donotreply", to, subject, msg)
-    send_message(make_service(), "me", raw_msg)
+    msg = f'<p>Go to https://www.masonuvagun.xyz?gameID={gameID} to make your move</p>'
+    msg = create_message(receiver=to, subject=subject, contents_html=msg)
+    with _get_server() as server:
+        server.sendmail(_FROM_ADDRESS, to, msg.as_string())
 
 
 if __name__ == '__main__':

@@ -2,35 +2,25 @@
 <html>
 
 <head>
-    <!-- <link rel="stylesheet" 
-          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"> -->
     <meta charset="UTF-8">
-    <title>ElmFight</title>
-    <script type="text/javascript" src="elm.js"></script>
+    <title>BlockJitsu</title>
+    <script type="text/javascript" src="elm.min.js"></script>
     <meta name="viewport" content="width=device-width, user-scalable=no">
-    <script src="https://apis.google.com/js/platform.js" async defer></script>
-    <meta name="google-signin-client_id" content="273516271136-8jbk5ujh74gc2hhnhssnkuifavt20mg9.apps.googleusercontent.com">
-
-    <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"> -->
 </head>
 
 <body>
-    <div class="g-signin2" data-onsuccess="onSignIn" id="signInButton"></div>
-    <div id="ElmFight"></div>
+    <!-- <div class="g-signin2" data-onsuccess="onSignIn" id="signInButton"></div> -->
+    <div id="BlockJitsu"></div>
 </body>
 
 <script type="text/javascript">
-function onSignIn(googleUser) {
-  var profile = googleUser.getBasicProfile();
-  // console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
-  // console.log('Name: ' + profile.getName());
-  // console.log('Image URL: ' + profile.getImageUrl());
-  console.log('Email: ' + profile.getEmail()); // This is null if the 'email' scope is not present.
-  // signInButton
-    var x = document.getElementById("signInButton");
-    x.style.display = "none";
-    initApp(profile.getEmail());
-}
+window.addEventListener("load", (event) => {
+    // var x = document.getElementById("signInButton");
+    // x.style.display = "none";
+    initApp("test@gmail.com");
+    // TODO ask server if email is known and do JWT stuff
+    // TODO add web notifications
+});
 
 var vis = (function(){
     var stateKey, eventKey, keys = {
@@ -54,8 +44,9 @@ var vis = (function(){
 function initApp(email) {
 
     // Start the Elm application.
+    // TODO handle url stuff here
     var app = Elm.Main.init({
-        node: document.getElementById('ElmFight'),
+        node: document.getElementById('BlockJitsu'),
         flags: {'windowWidth': window.innerWidth, 'windowHeight': window.innerHeight, 'email': email}
     });
 
@@ -71,7 +62,7 @@ function initApp(email) {
     function subToGame(gameID, color=null) {
         if (window["WebSocket"]) {
             closeConn();
-            conn = new WebSocket("wss://" + document.location.host + "/ws" + "?gameID=" + gameID);
+            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
             conn.onclose = function (evt) {
                 console.log("Host closed connection!")
                 app.ports.receiveConnectionLost.send("Host closed connection.")
@@ -90,7 +81,7 @@ function initApp(email) {
 
 
     function requestStatus(gameID, cb) {
-        const request = new Request('https://' + document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {
@@ -126,7 +117,8 @@ function initApp(email) {
         if (!vis()) {
             alert("Next turn!")
         }
-        const r = 'https://' + document.location.host + '/sendNotificationEmail?email='+email+'&gameID='+gameID
+        return;
+        const r = 'http://' + document.location.host + '/sendNotificationEmail?email='+email+'&gameID='+gameID
         const request = new Request(r);
         console.log("in sendNotificationEmail " + r)
         fetch(request)

@@ -23,7 +23,7 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 }
 func serveJS(w http.ResponseWriter, r *http.Request) {
     log.Println(r.URL)
-    if r.URL.Path != "/elm.js" {
+    if r.URL.Path != "/elm.min.js" {
         http.Error(w, "Not found", http.StatusNotFound)
         return
     }
@@ -31,7 +31,7 @@ func serveJS(w http.ResponseWriter, r *http.Request) {
         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
         return
     }
-    http.ServeFile(w, r, "./elm.js")
+    http.ServeFile(w, r, "./elm.min.js")
 }
 
 var (
@@ -96,7 +96,7 @@ func makeHTTPServer() *http.Server {
     }
     mux.HandleFunc("/", serveHome)
     // mux.HandleFunc("/.well-known/pki-validation/B0BF35BDC0BC60AD9175C9CEA6E49315.txt", serveDNSValid)
-    mux.HandleFunc("/elm.js", serveJS)
+    mux.HandleFunc("/elm.min.js", serveJS)
     mux.HandleFunc("/gameIDStatus", handleGameID)
     mux.HandleFunc("/sendNotificationEmail", sendNotificationEmail)
     mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

@@ -1,9 +1,6 @@
 elm-stuff
 elm-stuff/*
-target_prod
-target_prod/*
-target_devel
-target_devel/*
+target/
 elm.js
 elm.min.js
 .DS_Store

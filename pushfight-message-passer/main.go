@@ -1,21 +1,12 @@
-// // Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
-// // Use of this source code is governed by a BSD-style
-// // license that can be found in the LICENSE file.
-// // 2020 Code modified by Michael Mason from https://github.com/gorilla/websocket/tree/master/examples/chat
-
 package main
 
 import (
-    "context"
-    "crypto/tls"
     "flag"
     "fmt"
-    // "io"
     "log"
     "net/http"
     "time"
     "os/exec"
-    "golang.org/x/crypto/acme/autocert"
 )
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
@@ -44,13 +35,9 @@ func serveJS(w http.ResponseWriter, r *http.Request) {
 }
 
 var (
-    flgProduction          = true
-    flgRedirectHTTPToHTTPS = true
+    httpPort = ""
 )
 
-// func handleIndex(w http.ResponseWriter, r *http.Request) {
-//     io.WriteString(w, htmlIndex)
-// }
 
 func makeServerFromMux(mux *http.ServeMux) *http.Server {
     // set timeouts so that a slow or malicious client doesn't
@@ -63,26 +50,9 @@ func makeServerFromMux(mux *http.ServeMux) *http.Server {
     }
 }
 
-// func makeHTTPServer() *http.Server {
-//     mux := &http.ServeMux{}
-//     mux.HandleFunc("/", handleIndex)
-//     return makeServerFromMux(mux)
-
-// }
-
-func makeHTTPToHTTPSRedirectServer() *http.Server {
-    handleRedirect := func(w http.ResponseWriter, r *http.Request) {
-        newURI := "https://" + r.Host + r.URL.String()
-        http.Redirect(w, r, newURI, http.StatusFound)
-    }
-    mux := &http.ServeMux{}
-    mux.HandleFunc("/", handleRedirect)
-    return makeServerFromMux(mux)
-}
 
 func parseFlags() {
-    flag.BoolVar(&flgProduction, "production", false, "if true, we start HTTPS server")
-    flag.BoolVar(&flgRedirectHTTPToHTTPS, "redirect-to-https", false, "if true, we redirect HTTP to HTTPS")
+    flag.StringVar(&httpPort, "port", "9898", "port to start HTTP server. Defaults to 9898")
     flag.Parse()
 }
 
@@ -98,12 +68,9 @@ func sendNotificationEmail(w http.ResponseWriter, r *http.Request) {
         log.Println("Url Param 'gameID' is missing")
         return
     }
-    // exec.Command("python", "../send_gmail/send.py", "turn_notification", email[0],  gameID[0])
-    // cmd := fmt.Sprintf("./send.py turn_notification %s %s", email[0],  gameID[0])
     err := exec.Command("./send.py", "turn_notification", email[0], gameID[0]).Run()
     if err != nil {
         log.Println("Failed to run email cmd")
-        // log.Println(err)
     }
 }
 
@@ -158,61 +125,11 @@ func makeHTTPServer() *http.Server {
 
 func main() {
     parseFlags()
-    var m *autocert.Manager
-
-    var httpsSrv *http.Server
-    var httpPort string
-    if flgProduction {
-        httpPort = "0.0.0.0:80"
-        hostPolicy := func(ctx context.Context, host string) error {
-            // Note: change to your real host
-            allowedHosts := []string{"www.masonuvagun.xyz", "masonuvagun.xyz"}
-            fmt.Println(host)
-            for _, allowedHost := range allowedHosts {
-                if host == allowedHost {
-                    return nil
-                }                
-            }
-
-            return fmt.Errorf("acme/autocert: only %s hosts are allowed", allowedHosts)
-        }
-
-        dataDir := "."
-        m = &autocert.Manager{
-            Prompt:     autocert.AcceptTOS,
-            HostPolicy: hostPolicy,
-            Cache:      autocert.DirCache(dataDir),
-        }
-
-        httpsSrv = makeHTTPServer()
-        httpsSrv.Addr = ":443"
-        httpsSrv.TLSConfig = &tls.Config{GetCertificate: m.GetCertificate}
-
-        go func() {
-            fmt.Printf("Starting HTTPS server on %s\n", httpsSrv.Addr)
-            err := httpsSrv.ListenAndServeTLS("", "")
-            if err != nil {
-                log.Fatalf("httpsSrv.ListendAndServeTLS() failed with %s", err)
-            }
-        }()
-    } else {
-        httpPort = "0.0.0.0:8000"
-    }
+    httpPort = "0.0.0.0:" + httpPort
 
     var httpSrv *http.Server
-    if flgRedirectHTTPToHTTPS {
-        httpSrv = makeHTTPToHTTPSRedirectServer()
-    } else {
-        httpSrv = makeHTTPServer()
-    }
-    // allow autocert handle Let's Encrypt callbacks over http
-    if m != nil {
-        httpSrv.Handler = m.HTTPHandler(httpSrv.Handler)
-    }
-
+    httpSrv = makeHTTPServer()
     httpSrv.Addr = httpPort
-
-    // pfdata := setupPushfight()
 
     fmt.Printf("Starting HTTP server on %s\n", httpPort)
     err := httpSrv.ListenAndServe()
@@ -220,5 +137,3 @@ func main() {
         log.Fatalf("httpSrv.ListenAndServe() failed with %s", err)
     }
 }
-
-// ./pushfight-message-passer_linux --production --redirect-to-https

@@ -62,7 +62,7 @@ function initApp(email) {
     function subToGame(gameID, color=null) {
         if (window["WebSocket"]) {
             closeConn();
-            conn = new WebSocket("ws://" + document.location.host + "/ws" + "?gameID=" + gameID);
+            conn = new WebSocket("wss://" + document.location.host + "/ws" + "?gameID=" + gameID);
             conn.onclose = function (evt) {
                 console.log("Host closed connection!")
                 app.ports.receiveConnectionLost.send("Host closed connection.")
@@ -81,7 +81,7 @@ function initApp(email) {
 
 
     function requestStatus(gameID, cb) {
-        const request = new Request('http://' + document.location.host + '/gameIDStatus?gameID='+gameID);
+        const request = new Request('https://' + document.location.host + '/gameIDStatus?gameID='+gameID);
         fetch(request)
             .then(response => {
                 if (response.status === 200) {
@@ -118,7 +118,7 @@ function initApp(email) {
             alert("Next turn!")
         }
         return;
-        const r = 'http://' + document.location.host + '/sendNotificationEmail?email='+email+'&gameID='+gameID
+        const r = 'https://' + document.location.host + '/sendNotificationEmail?email='+email+'&gameID='+gameID
         const request = new Request(r);
         console.log("in sendNotificationEmail " + r)
         fetch(request)

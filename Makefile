@@ -12,13 +12,12 @@ target/elm.min.js: pushfight-viz/*.elm
 	cat ./target/elm.optimized.js | uglifyjs -m -c -o ./target/elm.min.js
 	rm ./target/elm.optimized.js
 
-target/pushfight-message-passer: pushfight-message-passer/*.go
-	 cd ./pushfight-message-passer/ && go build .
-	 mv ./pushfight-message-passer/pushfight-message-passer ./target
+target/pushfight-message-passer_linux_amd64 target/pushfight-message-passer_darwin_arm64: pushfight-message-passer/*.go
+	# https://go.dev/doc/install
+	cd ./pushfight-message-passer && GOOS=linux GOARCH=amd64 go build .
+	mv ./pushfight-message-passer/pushfight-message-passer ./target/pushfight-message-passer_linux_amd64
+	cd ./pushfight-message-passer && GOOS=darwin GOARCH=arm64 go build .
+	mv ./pushfight-message-passer/pushfight-message-passer ./target/pushfight-message-passer_darwin_arm64
 
 target/index.html: pushfight-viz/index.html
 	cp pushfight-viz/index.html target/index.html
-
-.PHONY: run
-run: target/elm.min.js target/pushfight-message-passer target/index.html
-	cd target && ./pushfight-message-passer

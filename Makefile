@@ -1,5 +1,8 @@
 .DELETE_ON_ERROR:
 
+.PHONY: build
+build: target/elm.min.js target/pushfight-message-passer_linux_amd64 target/pushfight-message-passer_darwin_arm64 target/index.html
+
 .PHONY: clean
 clean:
 	rm -f target/*
